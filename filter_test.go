@@ -33,8 +33,6 @@ func TestFilter(t *testing.T) {
 			t.Error("Wrong capacity returned")
 		}
 
-		t.Error(info)
-
 		t.Run("set key", func(t *testing.T) {
 			_, err := f.Set("foo")
 			if err != nil {
