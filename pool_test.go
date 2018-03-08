@@ -15,7 +15,10 @@ func TestPool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+
+	if pool.Len() != 4 {
+		t.Error("Pool should have 4 connections", pool.Len())
+	}
 
 	resp, err := c.sendAndReceive([]byte("foo"))
 	if err != nil {
@@ -24,5 +27,10 @@ func TestPool(t *testing.T) {
 
 	if resp != "Client Error: Command not supported" {
 		t.Error("Wrong error received")
+	}
+
+	c.Close()
+	if pool.Len() != 5 {
+		t.Error("Pool should have 5 connections", pool.Len())
 	}
 }
