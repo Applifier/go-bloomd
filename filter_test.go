@@ -1,12 +1,11 @@
 package bloomd
 
 import (
-	"os"
 	"testing"
 )
 
 func TestFilter(t *testing.T) {
-	c, err := NewFromAddr(os.Getenv("BLOOMD"))
+	c, err := NewFromAddr(getBloomdAddr())
 	if err != nil {
 		t.Fatal(err)
 	}
