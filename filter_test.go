@@ -96,7 +96,8 @@ func BenchmarkFilter(b *testing.B) {
 	defer c.Close()
 
 	f, err := c.CreateFilter(Filter{
-		Name: "benchmarkfilter",
+		Name:     "benchmarkfilter",
+		InMemory: true,
 	})
 	if err != nil {
 		b.Fatal(err)

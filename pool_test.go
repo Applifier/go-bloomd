@@ -88,7 +88,8 @@ func BenchmarkPoolParallelSetCheck(b *testing.B) {
 	}
 
 	_, err = c.CreateFilter(Filter{
-		Name: "benchmarkfilter",
+		Name:     "benchmarkfilter",
+		InMemory: true,
 	})
 	if err != nil {
 		b.Fatal(err)
