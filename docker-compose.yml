@@ -1,0 +1,22 @@
+version: "3"
+
+services:
+  test:
+    image: golang:1.10
+    volumes:
+      - .:/go/src/github.com/Applifier/go-bloomd
+    working_dir: /go/src/github.com/Applifier/go-bloomd
+    command: go test ./...
+    links:
+      - bloomd
+    environment:
+      BLOOMD: bloomd:8673
+
+  bloomd:
+    expose:
+      - "8673"
+    ports:
+      - "8673:8673"
+    build:
+      dockerfile: ./scripts/Dockerfile_bloomd
+      context: .

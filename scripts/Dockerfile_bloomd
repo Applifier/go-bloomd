@@ -1,0 +1,34 @@
+FROM debian:jessie-slim
+
+ENV BLOOMD_VERSION 0.7.5
+
+RUN apt-get update && \
+  apt-get install -y g++ ca-certificates wget scons && \
+  apt-get clean && \
+  rm -fr /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN \
+  mkdir -p /tmp/bloomd /data /etc/bloomd && \
+  wget https://github.com/armon/bloomd/archive/v${BLOOMD_VERSION}.tar.gz -O - \
+	| tar -xvz --strip=1 -C /tmp/bloomd && \
+  cd /tmp/bloomd && \
+  scons && \
+  mv /tmp/bloomd/bloomd /usr/local/bin/ && \
+  rm -rf /tmp/bloomd
+
+
+# Write config file
+RUN echo '# Settings for bloomd\n\
+[bloomd]\n\
+tcp_port = 8673\n\
+data_dir = /data/bloomd\n\
+log_level = DEBUG\n\
+flush_interval = 300\n\
+workers = 2\n'\
+>> /etc/bloomd.conf
+
+# Define default command.
+CMD /usr/local/bin/bloomd -f /etc/bloomd.conf
+
+# Expose ports.
+EXPOSE 8673
