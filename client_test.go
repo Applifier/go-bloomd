@@ -11,13 +11,9 @@ func TestClientConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := c.sendAndReceive([]byte("foo"))
+	err = c.Ping()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if resp != "Client Error: Command not supported" {
-		t.Error("Wrong resp received", resp)
 	}
 
 	err = c.Close()

@@ -2,6 +2,7 @@ package bloomd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -130,6 +131,19 @@ func (cli *Client) Close() error {
 	}
 
 	return cli.conn.Close()
+}
+
+// Ping pings the server
+func (cli *Client) Ping() error {
+	resp, err := cli.sendAndReceive([]byte("ping"))
+	// Yeap bloomd has no actual ping command. But this should cause the least amount of side effects
+	if resp != "Client Error: Command not supported" {
+		return Error{
+			Message: "invalid response received",
+			Err:     errors.New(resp),
+		}
+	}
+	return err
 }
 
 func (cli *Client) send(cmd []byte) error {
