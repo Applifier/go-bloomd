@@ -16,7 +16,8 @@ func TestFilter(t *testing.T) {
 
 	t.Run("create filter", func(t *testing.T) {
 		f, err := c.CreateFilter(Filter{
-			Name: "somefilter",
+			Name:     "somefilter",
+			InMemory: true,
 		})
 
 		if err != nil {
@@ -31,6 +32,8 @@ func TestFilter(t *testing.T) {
 		if info["capacity"] != "100000" {
 			t.Error("Wrong capacity returned")
 		}
+
+		t.Error(info)
 
 		t.Run("set key", func(t *testing.T) {
 			_, err := f.Set("foo")
@@ -101,6 +104,11 @@ func BenchmarkFilter(b *testing.B) {
 	})
 	if err != nil {
 		b.Fatal(err)
+	}
+
+	info, _ := f.Info()
+	if info["in_memory"] != "1" {
+		b.Fatal("Not in memory")
 	}
 
 	b.ResetTimer()
