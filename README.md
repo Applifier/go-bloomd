@@ -3,7 +3,7 @@
 
 # go-bloomd
 
-Bloomd client (with connection pool) for Go
+Bloomd (https://github.com/armon/bloomd) client (with connection pool) for Go
 
 
 ```sh
