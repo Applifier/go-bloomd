@@ -25,7 +25,7 @@ found, _ := f.Check("foobar")
 
 ## Client pool
 
-Client pools can be used to maintain persistent connections to bloomd server
+Client pools can be used to maintain a pool of persistent connections to bloomd server
 
 ```go
 p, _ := bloomd.NewPoolFromAddr(5, 10, "localhost:8673")
