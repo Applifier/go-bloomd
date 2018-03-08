@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/Applifier/go-bloomd.svg?branch=master)](https://travis-ci.org/Applifier/go-bloomd)
 [![GoDoc](https://godoc.org/github.com/Applifier/go-bloomd?status.svg)](http://godoc.org/github.com/Applifier/go-bloomd)
 
 # go-bloomd
