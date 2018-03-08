@@ -1,6 +1,8 @@
 package bloomd
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
 )
 
@@ -83,4 +85,34 @@ func TestFilter(t *testing.T) {
 		})
 	})
 
+}
+
+func BenchmarkFilter(b *testing.B) {
+	c, err := NewFromAddr(getBloomdAddr())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer c.Close()
+
+	f, err := c.CreateFilter(Filter{
+		Name: "benchmarkfilter",
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("key_%d", rand.Int())
+		_, err := f.Set(key)
+		if err != nil {
+			b.Fatal(err)
+		}
+		_, err = f.Check(key)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }
