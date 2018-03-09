@@ -28,6 +28,8 @@ type Client struct {
 	conn              net.Conn
 	reader            *bufio.Reader
 	connErrorReturned bool
+
+	clientPool *sync.Pool
 }
 
 // NewFromAddr creates a new bloomd client from addr
@@ -42,14 +44,10 @@ func NewFromAddr(addr string) (*Client, error) {
 
 // NewFromConn creates a new bloomd client from net.Conn
 func NewFromConn(conn net.Conn) (cli *Client, err error) {
-	poolOnce.Do(func() {
-		rpool = newReaderPool(DefaultBufferSize)
-	})
+	cli = &Client{}
+	cli.reset(conn)
 
-	return &Client{
-		conn:   conn,
-		reader: rpool.Get(conn),
-	}, nil
+	return cli, nil
 }
 
 // ListFilters list all filters
@@ -130,7 +128,13 @@ func (cli *Client) Close() error {
 		}
 	}
 
-	return cli.conn.Close()
+	err := cli.conn.Close()
+
+	if cli.clientPool != nil {
+		cli.clientPool.Put(cli)
+	}
+
+	return err
 }
 
 // Ping pings the server
@@ -144,6 +148,15 @@ func (cli *Client) Ping() error {
 		}
 	}
 	return err
+}
+
+func (cli *Client) reset(conn net.Conn) {
+	poolOnce.Do(func() {
+		rpool = newReaderPool(DefaultBufferSize)
+	})
+
+	cli.conn = conn
+	cli.reader = rpool.Get(conn)
 }
 
 func (cli *Client) send(cmd []byte) error {

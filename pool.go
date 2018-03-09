@@ -2,6 +2,7 @@ package bloomd
 
 import (
 	"net"
+	"sync"
 
 	pool "gopkg.in/fatih/pool.v2"
 )
@@ -11,7 +12,8 @@ type Factory func() (net.Conn, error)
 
 // Pool of bloomd clients
 type Pool struct {
-	connPool pool.Pool
+	connPool         pool.Pool
+	clientStructPool *sync.Pool
 }
 
 // NewPoolFromAddr return a new pool of client for addr
@@ -28,7 +30,17 @@ func NewPoolFromFactory(initialCap, maxCap int, factory Factory) (*Pool, error) 
 		return nil, err
 	}
 
-	return &Pool{connPool: p}, nil
+	clientStructPool := &sync.Pool{}
+	clientStructPool.New = func() interface{} {
+		return &Client{
+			clientPool: clientStructPool,
+		}
+	}
+
+	return &Pool{
+		connPool:         p,
+		clientStructPool: clientStructPool,
+	}, nil
 }
 
 // Get returns a new client from the pool. Client is returned to pool by calling client.Close()
@@ -38,7 +50,10 @@ func (p *Pool) Get() (*Client, error) {
 		return nil, err
 	}
 
-	return NewFromConn(conn)
+	cli := p.clientStructPool.Get().(*Client)
+	cli.reset(conn)
+
+	return cli, nil
 }
 
 // Close close pool
