@@ -101,7 +101,7 @@ func BenchmarkPoolParallelSetCheck(b *testing.B) {
 		}
 		defer c.Close()
 		for pb.Next() {
-			f := c.Filter(filterName)
+			f := c.GetFilter(filterName)
 			key := fmt.Sprintf("key_%d", rand.Int())
 			_, err := f.Set(key)
 			if err != nil {

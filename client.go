@@ -86,14 +86,14 @@ func (cli *Client) ListFilters() ([]Filter, error) {
 
 	filters := make([]Filter, len(filterNames))
 	for i, filter := range filterNames {
-		filters[i] = cli.Filter(filter)
+		filters[i] = cli.GetFilter(filter)
 	}
 
 	return filters, nil
 }
 
-// Filter returns a previously created filter
-func (cli *Client) Filter(name string) Filter {
+// GetFilter returns a previously created filter
+func (cli *Client) GetFilter(name string) Filter {
 	return Filter{
 		Name:   name,
 		client: cli,
@@ -102,11 +102,7 @@ func (cli *Client) Filter(name string) Filter {
 
 // CreateFilter creates a new filter or returns an existing one
 func (cli *Client) CreateFilter(name string, capacity int, prob float64, inMemory bool) (Filter, error) {
-	f := Filter{
-		Name:   name,
-		client: cli,
-	}
-	f.client = cli
+	f := cli.GetFilter(name)
 
 	if prob > 0 && capacity < 1 {
 		return f, Error{
