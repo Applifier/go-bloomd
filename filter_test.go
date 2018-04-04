@@ -11,10 +11,7 @@ func TestFilter(t *testing.T) {
 	defer closeClient(t, c)
 
 	t.Run("create filter", func(t *testing.T) {
-		f, err := c.CreateFilter(Filter{
-			Name:     "somefilter",
-			InMemory: true,
-		})
+		f, err := c.CreateFilter("somefilter", 0, 0, true)
 
 		if err != nil {
 			t.Fatal(err)
@@ -203,10 +200,7 @@ func BenchmarkFilterOperations(b *testing.B) {
 }
 
 func createBenchmarkFilter(b *testing.B, c *Client, name string) Filter {
-	f, err := c.CreateFilter(Filter{
-		Name:     fmt.Sprintf("run_%s_%d", name, b.N),
-		InMemory: true,
-	})
+	f, err := c.CreateFilter(name, 0, 0, true)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -8,10 +8,6 @@ import (
 type Filter struct {
 	Name string
 
-	Capacity int
-	Prob     float64
-	InMemory bool
-
 	client *Client
 }
 

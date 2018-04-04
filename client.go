@@ -86,14 +86,14 @@ func (cli *Client) ListFilters() ([]Filter, error) {
 
 	filters := make([]Filter, len(filterNames))
 	for i, filter := range filterNames {
-		filters[i] = cli.GetFilter(filter)
+		filters[i] = cli.Filter(filter)
 	}
 
 	return filters, nil
 }
 
-// GetFilter returns a previously created filter
-func (cli *Client) GetFilter(name string) Filter {
+// Filter returns a previously created filter
+func (cli *Client) Filter(name string) Filter {
 	return Filter{
 		Name:   name,
 		client: cli,
@@ -101,10 +101,14 @@ func (cli *Client) GetFilter(name string) Filter {
 }
 
 // CreateFilter creates a new filter or returns an existing one
-func (cli *Client) CreateFilter(f Filter) (Filter, error) {
+func (cli *Client) CreateFilter(name string, capacity int, prob float64, inMemory bool) (Filter, error) {
+	f := Filter{
+		Name:   name,
+		client: cli,
+	}
 	f.client = cli
 
-	if f.Prob > 0 && f.Capacity < 1 {
+	if prob > 0 && capacity < 1 {
 		return f, Error{
 			Message: "Invalid capacity",
 		}
@@ -113,13 +117,13 @@ func (cli *Client) CreateFilter(f Filter) (Filter, error) {
 	var b buffer.Buffer
 
 	b.Write([]byte("create " + f.Name))
-	if f.Capacity > 0 {
-		b.Write([]byte(" capacity=" + strconv.Itoa(f.Capacity)))
+	if capacity > 0 {
+		b.Write([]byte(" capacity=" + strconv.Itoa(capacity)))
 	}
-	if f.Prob > 0 {
-		b.Write([]byte(" prob=" + strconv.FormatFloat(f.Prob, 'f', -1, 64)))
+	if prob > 0 {
+		b.Write([]byte(" prob=" + strconv.FormatFloat(prob, 'f', -1, 64)))
 	}
-	if f.InMemory {
+	if inMemory {
 		b.Write([]byte(" in_memory=1"))
 	}
 
