@@ -200,7 +200,7 @@ func BenchmarkFilterOperations(b *testing.B) {
 }
 
 func createBenchmarkFilter(b *testing.B, c *Client, name string) Filter {
-	f, err := c.CreateFilter(name, 0, 0, true)
+	f, err := c.CreateFilter(fmt.Sprintf("run_%s_%d", name, b.N), 0, 0, true)
 	if err != nil {
 		b.Fatal(err)
 	}

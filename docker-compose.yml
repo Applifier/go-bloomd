@@ -10,7 +10,8 @@ services:
     links:
       - bloomd
     environment:
-      BLOOMD: bloomd:8673
+      BLOOMD_TCP: tcp://bloomd:8673
+      BLOOMD_SCHEMAS: TCP
 
   bloomd:
     expose:

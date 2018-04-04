@@ -1,22 +1,20 @@
 package bloomd
 
 import (
+	"fmt"
 	"log"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 )
 
 var bloomdAddr string
 
 func TestMain(m *testing.M) {
-	addrs := []string{
-		getBloomdUnixAddr(),
-		getBloomdTCPAddr(),
-	}
-	for _, addr := range addrs {
-		log.Printf("Bloomd addr: %s", addr)
-		bloomdAddr = addr
+	for _, schema := range getSchemaList() {
+		bloomdAddr = getBloomdAddr(schema)
+		log.Printf("Bloomd addr: %s", bloomdAddr)
 		if code := m.Run(); code != 0 {
 			os.Exit(code)
 		}
@@ -32,12 +30,19 @@ func getBloomdURL(tb testing.TB) *url.URL {
 	return u
 }
 
-func getBloomdTCPAddr() string {
-	return getEnv("BLOOMD", "tcp://localhost:8673")
+var bloomdAddrDefaults = map[string]string{
+	"TCP":  "tcp://localhost:8673",
+	"UNIX": "unix:///tmp/bloomd.sock",
 }
 
-func getBloomdUnixAddr() string {
-	return getEnv("BLOOMD", "unix:///tmp/bloomd.sock")
+func getBloomdAddr(schema string) string {
+	defaultAddr := bloomdAddrDefaults[schema]
+	return getEnv(fmt.Sprintf("BLOOMD_%s", schema), defaultAddr)
+}
+
+func getSchemaList() []string {
+	schemas := getEnv("BLOOMD_SCHEMAS", "TCP,UNIX")
+	return strings.Split(schemas, ",")
 }
 
 func getEnv(name string, def string) string {
