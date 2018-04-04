@@ -2,6 +2,7 @@ package bloomd
 
 import (
 	"net"
+	"net/url"
 	"sync"
 
 	pool "gopkg.in/fatih/pool.v2"
@@ -18,8 +19,19 @@ type Pool struct {
 
 // NewPoolFromAddr return a new pool of client for addr
 func NewPoolFromAddr(initialCap, maxCap int, addr string) (*Pool, error) {
+	l, err := url.Parse(addr)
+	if err != nil {
+		return nil, err
+	}
 	return NewPoolFromFactory(initialCap, maxCap, func() (net.Conn, error) {
-		return net.Dial("tcp", addr)
+		return createSocket(l)
+	})
+}
+
+// NewPoolFromURL return a new pool of client for locator
+func NewPoolFromURL(initialCap, maxCap int, u *url.URL) (*Pool, error) {
+	return NewPoolFromFactory(initialCap, maxCap, func() (net.Conn, error) {
+		return createSocket(u)
 	})
 }
 
@@ -56,12 +68,12 @@ func (p *Pool) Get() (*Client, error) {
 	return cli, nil
 }
 
-// Close close pool
+// Close closes pool
 func (p *Pool) Close() {
 	p.connPool.Close()
 }
 
-// Len return pool length
+// Len returns pool length
 func (p *Pool) Len() int {
 	return p.connPool.Len()
 }

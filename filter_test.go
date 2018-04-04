@@ -7,12 +7,8 @@ import (
 )
 
 func TestFilter(t *testing.T) {
-	c, err := NewFromAddr(getBloomdAddr())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer c.Close()
+	c := createClient(t)
+	defer closeClient(t, c)
 
 	t.Run("create filter", func(t *testing.T) {
 		f, err := c.CreateFilter(Filter{
@@ -85,41 +81,140 @@ func TestFilter(t *testing.T) {
 			}
 		})
 	})
-
 }
 
-func BenchmarkFilter(b *testing.B) {
-	c, err := NewFromAddr(getBloomdAddr())
-	if err != nil {
-		b.Fatal(err)
+const maxParallelism = 10
+
+func BenchmarkParallelFilterOperations(b *testing.B) {
+	filterName := fmt.Sprintf("%s_benchmark_parallel_filter", getBloomdURL(b).Scheme)
+
+	createClientAndFilter := func(b *testing.B, filterName string) (*Client, Filter) {
+		c := createClient(b)
+		return c, createBenchmarkFilter(b, c, filterName)
 	}
 
-	defer c.Close()
+	b.Run("Set", func(b *testing.B) {
+		b.RunParallel(func(pb *testing.PB) {
+			c, f := createClientAndFilter(b, filterName)
+			defer closeClient(b, c)
+			for pb.Next() {
+				key := fmt.Sprintf("key_%d", rand.Intn(b.N))
+				_, err := f.Set(key)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	})
 
+	b.Run("Check", func(b *testing.B) {
+		b.RunParallel(func(pb *testing.PB) {
+			c, f := createClientAndFilter(b, filterName)
+			defer closeClient(b, c)
+			for pb.Next() {
+				key := fmt.Sprintf("key_%d", rand.Intn(b.N))
+				_, err := f.Check(key)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	})
+
+	b.Run("SetAndCheck", func(b *testing.B) {
+		b.RunParallel(func(pb *testing.PB) {
+			c, f := createClientAndFilter(b, filterName)
+			defer closeClient(b, c)
+			for pb.Next() {
+				key := fmt.Sprintf("key_%d", rand.Intn(b.N))
+				_, err := f.Set(key)
+				if err != nil {
+					b.Fatal(err)
+				}
+				_, err = f.Check(key)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	})
+
+	c, f := createClientAndFilter(b, filterName)
+	defer closeClient(b, c)
+	defer dropFilter(b, f)
+}
+
+func BenchmarkFilterOperations(b *testing.B) {
+	c := createClient(b)
+	defer closeClient(b, c)
+
+	b.Run("Set", func(b *testing.B) {
+		f := createBenchmarkFilter(b, c, "benchmark_filter_set")
+		defer dropFilter(b, f)
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("key_%d", i)
+			_, err := f.Set(key)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("CheckPositives", func(b *testing.B) {
+		f := createBenchmarkFilter(b, c, "benchmark_filter_check_positives")
+		defer dropFilter(b, f)
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("key_%d", i)
+			_, err := f.Set(key)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("key_%d", i)
+			_, err := f.Check(key)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("CheckNegatives", func(b *testing.B) {
+		f := createBenchmarkFilter(b, c, "benchmark_filter_check_negatives")
+		defer dropFilter(b, f)
+
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("key_%d", i)
+			_, err := f.Check(key)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+func createBenchmarkFilter(b *testing.B, c *Client, name string) Filter {
 	f, err := c.CreateFilter(Filter{
-		Name:     "benchmarkfilter",
+		Name:     fmt.Sprintf("run_%s_%d", name, b.N),
 		InMemory: true,
 	})
 	if err != nil {
 		b.Fatal(err)
 	}
+	return f
+}
 
-	info, _ := f.Info()
-	if info["in_memory"] != "1" {
-		b.Fatal("Not in memory")
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		key := fmt.Sprintf("key_%d", rand.Int())
-		_, err := f.Set(key)
-		if err != nil {
-			b.Fatal(err)
-		}
-		_, err = f.Check(key)
-		if err != nil {
-			b.Fatal(err)
-		}
+func dropFilter(b *testing.B, f Filter) {
+	if err := f.Drop(); err != nil {
+		b.Fatal(err)
 	}
 }

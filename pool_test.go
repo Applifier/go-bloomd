@@ -7,7 +7,7 @@ import (
 )
 
 func TestPool(t *testing.T) {
-	pool, err := NewPoolFromAddr(5, 10, getBloomdAddr())
+	pool, err := NewPoolFromURL(5, 10, getBloomdURL(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestPool(t *testing.T) {
 }
 
 func BenchmarkPool(b *testing.B) {
-	pool, err := NewPoolFromAddr(30, 50, getBloomdAddr())
+	pool, err := NewPoolFromURL(30, 50, getBloomdURL(b))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func BenchmarkPool(b *testing.B) {
 }
 
 func BenchmarkPoolParallel(b *testing.B) {
-	pool, err := NewPoolFromAddr(30, 50, getBloomdAddr())
+	pool, err := NewPoolFromURL(30, 50, getBloomdURL(b))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -76,7 +76,9 @@ func BenchmarkPoolParallel(b *testing.B) {
 }
 
 func BenchmarkPoolParallelSetCheck(b *testing.B) {
-	pool, err := NewPoolFromAddr(30, 100, getBloomdAddr())
+	filterName := fmt.Sprintf("%s_benchmark_parallel_pool", getBloomdURL(b).Scheme)
+
+	pool, err := NewPoolFromURL(30, 100, getBloomdURL(b))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -87,13 +89,8 @@ func BenchmarkPoolParallelSetCheck(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	_, err = c.CreateFilter(Filter{
-		Name:     "benchmarkfilter",
-		InMemory: true,
-	})
-	if err != nil {
-		b.Fatal(err)
-	}
+	f := createBenchmarkFilter(b, c, filterName)
+	defer dropFilter(b, f)
 
 	c.Close()
 
@@ -104,7 +101,7 @@ func BenchmarkPoolParallelSetCheck(b *testing.B) {
 		}
 		defer c.Close()
 		for pb.Next() {
-			f := c.GetFilter("benchmarkfilter")
+			f := c.GetFilter(filterName)
 			key := fmt.Sprintf("key_%d", rand.Int())
 			_, err := f.Set(key)
 			if err != nil {
