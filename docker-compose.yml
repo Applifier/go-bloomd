@@ -7,7 +7,7 @@ services:
       - .:/go/src/github.com/Applifier/go-bloomd
       - socketvolume:/tmp
     working_dir: /go/src/github.com/Applifier/go-bloomd
-    command: go test -v ./...
+    command: go test -v -bench ./...
     links:
       - bloomd
     environment:
