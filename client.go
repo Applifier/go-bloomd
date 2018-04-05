@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,12 +35,34 @@ type Client struct {
 
 // NewFromAddr creates a new bloomd client from addr
 func NewFromAddr(addr string) (*Client, error) {
-	conn, err := createSocket(addr)
+	u, err := url.Parse(addr)
+	if err != nil {
+		return nil, err
+	}
+	return NewFromURL(u)
+}
+
+// NewFromURL creates a new bloomd client from URL struct
+func NewFromURL(u *url.URL) (*Client, error) {
+	conn, err := createSocket(u)
 	if err != nil {
 		return nil, err
 	}
 
 	return NewFromConn(conn)
+}
+
+func createSocket(u *url.URL) (net.Conn, error) {
+	switch u.Scheme {
+	case "unix":
+		return createUnixSocket(u.Path)
+	case "tcp":
+		return createTCPSocket(u.Host)
+	case "":
+		return nil, fmt.Errorf("error: scheme is not presented in the url")
+	default:
+		return nil, fmt.Errorf("error: %s scheme is not supported", u.Scheme)
+	}
 }
 
 // NewFromConn creates a new bloomd client from net.Conn
@@ -78,10 +101,10 @@ func (cli *Client) GetFilter(name string) Filter {
 }
 
 // CreateFilter creates a new filter or returns an existing one
-func (cli *Client) CreateFilter(f Filter) (Filter, error) {
-	f.client = cli
+func (cli *Client) CreateFilter(name string, capacity int, prob float64, inMemory bool) (Filter, error) {
+	f := cli.GetFilter(name)
 
-	if f.Prob > 0 && f.Capacity < 1 {
+	if prob > 0 && capacity < 1 {
 		return f, Error{
 			Message: "Invalid capacity",
 		}
@@ -90,13 +113,13 @@ func (cli *Client) CreateFilter(f Filter) (Filter, error) {
 	var b buffer.Buffer
 
 	b.Write([]byte("create " + f.Name))
-	if f.Capacity > 0 {
-		b.Write([]byte(" capacity=" + strconv.Itoa(f.Capacity)))
+	if capacity > 0 {
+		b.Write([]byte(" capacity=" + strconv.Itoa(capacity)))
 	}
-	if f.Prob > 0 {
-		b.Write([]byte(" prob=" + strconv.FormatFloat(f.Prob, 'f', -1, 64)))
+	if prob > 0 {
+		b.Write([]byte(" prob=" + strconv.FormatFloat(prob, 'f', -1, 64)))
 	}
-	if f.InMemory {
+	if inMemory {
 		b.Write([]byte(" in_memory=1"))
 	}
 
@@ -111,7 +134,7 @@ func (cli *Client) CreateFilter(f Filter) (Filter, error) {
 
 	if resp != "Done" && resp != "Exists" {
 		return f, Error{
-			Message: "invalid response received from server",
+			Message: fmt.Sprintf("invalid response received from server: %s", resp),
 		}
 	}
 
@@ -215,7 +238,19 @@ func (cli *Client) readList() ([]string, error) {
 	return lines, nil
 }
 
-func createSocket(saddr string) (net.Conn, error) {
+func createUnixSocket(saddr string) (net.Conn, error) {
+	addr, err := net.ResolveUnixAddr("unix", saddr)
+	if err != nil {
+		return nil, Error{Message: "error: can't resolve unix domain socket address", Err: err}
+	}
+	conn, err := net.DialUnix("unix", nil, addr)
+	if err != nil {
+		return nil, Error{Message: "error: could not create socket", Err: err}
+	}
+	return conn, nil
+}
+
+func createTCPSocket(saddr string) (net.Conn, error) {
 	addr, err := net.ResolveTCPAddr("tcp", saddr)
 	if err != nil {
 		return nil, Error{Message: "error: could not create socket", Err: err}
