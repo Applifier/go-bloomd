@@ -5,13 +5,15 @@ services:
     image: golang:1.10
     volumes:
       - .:/go/src/github.com/Applifier/go-bloomd
+      - socketvolume:/tmp
     working_dir: /go/src/github.com/Applifier/go-bloomd
-    command: go test ./...
+    command: go test -v ./...
     links:
       - bloomd
     environment:
       BLOOMD_TCP: tcp://bloomd:8673
-      BLOOMD_SCHEMAS: TCP
+      BLOOMD_UNIX: unix:///tmp/bloomd.sock
+      BLOOMD_SCHEMAS: TCP,UNIX
 
   bloomd:
     expose:
@@ -21,3 +23,8 @@ services:
     build:
       dockerfile: ./scripts/Dockerfile_bloomd
       context: .
+    volumes:
+      - socketvolume:/tmp
+
+volumes:
+  socketvolume: {}
