@@ -2,7 +2,6 @@ package bloomd
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -23,7 +22,6 @@ func TestMain(m *testing.M) {
 }
 
 func parseBloomdURL(tb testing.TB, addr string) *url.URL {
-	log.Printf("Bloomd addr: %s", addr)
 	u, err := url.Parse(addr)
 	if err != nil {
 		tb.Fatal(err)

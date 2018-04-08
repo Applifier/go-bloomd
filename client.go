@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"strconv"
@@ -193,15 +192,6 @@ func (cli *Client) reset(conn net.Conn) {
 	cli.writer.Reset(conn)
 }
 
-func (cli *Client) sendFrom(writerTo io.WriterTo) error {
-	_, err := writerTo.WriteTo(cli.conn)
-	if err != nil {
-		return cli.handleWriteError(err)
-	}
-	_, err = cli.conn.Write([]byte{'\n'})
-	return cli.handleWriteError(err)
-}
-
 func (cli *Client) send(cmd []byte) error {
 	_, err := cli.conn.Write(append(cmd, '\n'))
 	return cli.handleWriteError(err)
@@ -236,15 +226,6 @@ func (cli *Client) sendAndReceive(cmd []byte) (string, error) {
 		return "", err
 	}
 
-	return cli.read()
-}
-
-func (cli *Client) sendFromBufferAndReceive() (string, error) {
-	cli.writer.WriteByte(cmdDelimeter)
-	err := cli.writer.Flush()
-	if err != nil {
-		return "", cli.handleWriteError(err)
-	}
 	return cli.read()
 }
 

@@ -5,6 +5,7 @@ import (
 	"io"
 )
 
+// ResultReader allows to read filter results
 type ResultReader interface {
 	Next() (bool, error)
 	Close() error

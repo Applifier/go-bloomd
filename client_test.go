@@ -7,13 +7,15 @@ import (
 
 func TestClientConnect(t *testing.T) {
 	for _, addr := range bloomdAddrs {
-		c := createClientFromString(t, addr)
-		defer closeClient(t, c)
+		t.Run("Test address "+addr, func(t *testing.T) {
+			c := createClientFromString(t, addr)
+			defer closeClient(t, c)
 
-		err := c.Ping()
-		if err != nil {
-			t.Fatal(err)
-		}
+			err := c.Ping()
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
