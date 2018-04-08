@@ -1,16 +1,19 @@
 package bloomd
 
 import (
+	"net/url"
 	"testing"
 )
 
 func TestClientConnect(t *testing.T) {
-	c := createClient(t)
-	defer closeClient(t, c)
+	for _, addr := range bloomdAddrs {
+		c := createClientFromString(t, addr)
+		defer closeClient(t, c)
 
-	err := c.Ping()
-	if err != nil {
-		t.Fatal(err)
+		err := c.Ping()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -37,8 +40,12 @@ func TestClientConnectionError(t *testing.T) {
 	})
 }
 
-func createClient(tb testing.TB) *Client {
-	c, err := NewFromURL(getBloomdURL(tb))
+func createClientFromString(tb testing.TB, addr string) *Client {
+	return createClientFromURL(tb, parseBloomdURL(tb, addr))
+}
+
+func createClientFromURL(tb testing.TB, addr *url.URL) *Client {
+	c, err := NewFromURL(addr)
 	if err != nil {
 		tb.Fatal(err)
 	}

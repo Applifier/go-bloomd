@@ -11,38 +11,42 @@ type Filter struct {
 	client *Client
 }
 
+var yes = []byte("Yes")
+
 // BulkSet adds multiple keys to the filter
-func (f Filter) BulkSet(keys []string) (responses []bool, err error) {
-	resp, err := f.client.sendAndReceive([]byte("b " + f.Name + " " + strings.Join(keys, " ")))
+func (f Filter) BulkSet(keyset KeySet) (ResultReader, error) {
+	err := f.sendBatchOp("b", keyset)
 	if err != nil {
-		return nil, err
+		return nil, f.client.handleWriteError(err)
 	}
 
-	responses = make([]bool, len(keys))
-	respParts := strings.Split(resp, " ")
-
-	for i, respPart := range respParts {
-		responses[i] = respPart == "Yes"
-	}
-
-	return
+	return f.receiveBatchResponse(keyset.Length())
 }
 
 // MultiCheck checks multiple keys for the filter
-func (f Filter) MultiCheck(keys []string) (responses []bool, err error) {
-	resp, err := f.client.sendAndReceive([]byte("m " + f.Name + " " + strings.Join(keys, " ")))
+func (f Filter) MultiCheck(keyset KeySet) (ResultReader, error) {
+	err := f.sendBatchOp("m", keyset)
 	if err != nil {
-		return nil, err
+		return nil, f.client.handleWriteError(err)
 	}
 
-	responses = make([]bool, len(keys))
-	respParts := strings.Split(resp, " ")
+	return f.receiveBatchResponse(keyset.Length())
+}
 
-	for i, respPart := range respParts {
-		responses[i] = respPart == "Yes"
-	}
+func (f Filter) receiveBatchResponse(resultLength int) (ResultReader, error) {
+	f.client.resultReader.resetLength(resultLength)
+	return f.client.resultReader, nil
+}
 
-	return
+func (f Filter) sendBatchOp(op string, keyset KeySet) error {
+	w := f.client.writer
+	w.WriteString(op)
+	w.WriteByte(itemDelimeter)
+	w.WriteString(f.Name)
+	w.WriteByte(itemDelimeter)
+	w.ReadFrom(keyset.buffer)
+	w.WriteByte(cmdDelimeter)
+	return w.Flush()
 }
 
 // Clear clears the filter
@@ -87,23 +91,34 @@ func (f Filter) Info() (map[string]string, error) {
 }
 
 // Set sets a single key to the bloom
-func (f Filter) Set(key string) (bool, error) {
-	resp, err := f.client.sendAndReceive([]byte("s " + f.Name + " " + key))
+func (f Filter) Set(key Key) (bool, error) {
+	err := f.sendSingleOp("s", key)
 	if err != nil {
-		return false, err
+		return false, f.client.handleWriteError(err)
 	}
 
-	return resp == "Yes", nil
+	return f.client.resultReader.readLastResult()
 }
 
 // Check gets a single key to the bloom
-func (f Filter) Check(key string) (bool, error) {
-	resp, err := f.client.sendAndReceive([]byte("c " + f.Name + " " + key))
+func (f Filter) Check(key Key) (bool, error) {
+	err := f.sendSingleOp("c", key)
 	if err != nil {
-		return false, err
+		return false, f.client.handleWriteError(err)
 	}
 
-	return resp == "Yes", nil
+	return f.client.resultReader.readLastResult()
+}
+
+func (f Filter) sendSingleOp(op string, key Key) error {
+	w := f.client.writer
+	w.WriteString(op)
+	w.WriteByte(itemDelimeter)
+	w.WriteString(f.Name)
+	w.WriteByte(itemDelimeter)
+	w.Write(key)
+	w.WriteByte(cmdDelimeter)
+	return w.Flush()
 }
 
 func checkResponse(resp string, err error) error {

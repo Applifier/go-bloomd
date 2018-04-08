@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"strconv"
@@ -15,20 +16,21 @@ import (
 	pool "gopkg.in/fatih/pool.v2"
 )
 
-const startMarker = "START"
-const endMaker = "END"
-
 // DefaultBufferSize is the default size for the read buffer
 var DefaultBufferSize = 4096
 
-var rpool *readerpool
-var poolOnce = sync.Once{}
+const startMarker = "START"
+const endMaker = "END"
+const cmdDelimeter = '\n'
+const itemDelimeter = ' '
 
 // Client represents a bloomd client
 type Client struct {
-	conn              net.Conn
-	reader            *bufio.Reader
-	connErrorReturned bool
+	conn         net.Conn
+	resultReader *resultReader
+	reader       *bufio.Reader
+	writer       *bufio.Writer
+	err          error
 
 	clientPool *sync.Pool
 }
@@ -65,9 +67,20 @@ func createSocket(u *url.URL) (net.Conn, error) {
 	}
 }
 
+func newClient() *Client {
+	cli := &Client{
+		reader: bufio.NewReaderSize(nil, DefaultBufferSize),
+		writer: bufio.NewWriterSize(nil, DefaultBufferSize),
+	}
+	cli.resultReader = &resultReader{
+		client: cli,
+	}
+	return cli
+}
+
 // NewFromConn creates a new bloomd client from net.Conn
 func NewFromConn(conn net.Conn) (cli *Client, err error) {
-	cli = &Client{}
+	cli = newClient()
 	cli.reset(conn)
 
 	return cli, nil
@@ -143,9 +156,7 @@ func (cli *Client) CreateFilter(name string, capacity int, prob float64, inMemor
 
 // Close closes underlying connection or return the connection to the Pool if one was used
 func (cli *Client) Close() error {
-	rpool.Put(cli.reader)
-
-	if cli.connErrorReturned {
+	if cli.err != nil {
 		if pc, ok := cli.conn.(*pool.PoolConn); ok {
 			pc.MarkUnusable()
 		}
@@ -155,6 +166,9 @@ func (cli *Client) Close() error {
 
 	if cli.clientPool != nil {
 		cli.clientPool.Put(cli)
+	} else {
+		// Since we don't need a client object ny more, just handle the reference loop
+		cli.resultReader.client = nil
 	}
 
 	return err
@@ -174,30 +188,45 @@ func (cli *Client) Ping() error {
 }
 
 func (cli *Client) reset(conn net.Conn) {
-	poolOnce.Do(func() {
-		rpool = newReaderPool(DefaultBufferSize)
-	})
-
 	cli.conn = conn
-	cli.reader = rpool.Get(conn)
+	cli.reader.Reset(conn)
+	cli.writer.Reset(conn)
+}
+
+func (cli *Client) sendFrom(writerTo io.WriterTo) error {
+	_, err := writerTo.WriteTo(cli.conn)
+	if err != nil {
+		return cli.handleWriteError(err)
+	}
+	_, err = cli.conn.Write([]byte{'\n'})
+	return cli.handleWriteError(err)
 }
 
 func (cli *Client) send(cmd []byte) error {
 	_, err := cli.conn.Write(append(cmd, '\n'))
+	return cli.handleWriteError(err)
+}
 
+func (cli *Client) handleWriteError(err error) error {
 	if err != nil {
-		cli.connErrorReturned = true
+		cli.err = err
 		return Error{Err: err, Message: "error while writing to bloomd server", ShouldRetryWithNewClient: true}
 	}
+	return nil
+}
 
+func (cli *Client) handleReadError(err error) error {
+	if err != nil {
+		cli.err = err
+		return Error{Err: err, Message: "error while reader input from bloomd server", ShouldRetryWithNewClient: true}
+	}
 	return nil
 }
 
 func (cli *Client) read() (string, error) {
 	l, err := cli.reader.ReadString('\n')
 	if err != nil {
-		cli.connErrorReturned = true
-		return l, Error{Err: err, Message: "error while reader input from bloomd server", ShouldRetryWithNewClient: true}
+		return l, cli.handleReadError(err)
 	}
 	return strings.TrimRight(l, "\r\n"), nil
 }
@@ -207,6 +236,15 @@ func (cli *Client) sendAndReceive(cmd []byte) (string, error) {
 		return "", err
 	}
 
+	return cli.read()
+}
+
+func (cli *Client) sendFromBufferAndReceive() (string, error) {
+	cli.writer.WriteByte(cmdDelimeter)
+	err := cli.writer.Flush()
+	if err != nil {
+		return "", cli.handleWriteError(err)
+	}
 	return cli.read()
 }
 
