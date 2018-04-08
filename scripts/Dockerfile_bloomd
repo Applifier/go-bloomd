@@ -20,7 +20,7 @@ RUN apt-get update && \
 
 RUN \
   mkdir -p /tmp/bloomd /data /etc/bloomd && \
-  git clone https://github.com/Applifier/bloomd /tmp/bloomd -b feature/uds_support && \
+  git clone https://github.com/Applifier/bloomd /tmp/bloomd -b master && \
   cd /tmp/bloomd && \
   scons && scons test_bloomd_runner && \
   ./test_bloomd_runner && \
