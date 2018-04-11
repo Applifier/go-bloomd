@@ -13,7 +13,7 @@ services:
     environment:
       BLOOMD_TCP: tcp://bloomd:8673
       BLOOMD_UNIX: unix:///tmp/bloomd.sock
-      BLOOMD_SCHEMAS: UNIX
+      BLOOMD_SCHEMAS: TCP,UNIX
 
   bloomd:
     expose:
