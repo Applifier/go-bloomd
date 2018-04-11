@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/Applifier/go-bloomd.svg?branch=master)](https://travis-ci.org/Applifier/go-bloomd)
+[![Coverage Status](https://coveralls.io/repos/github/Applifier/go-bloomd/badge.svg?branch=master)](https://coveralls.io/github/Applifier/go-bloomd?branch=master)
 [![GoDoc](https://godoc.org/github.com/Applifier/go-bloomd?status.svg)](http://godoc.org/github.com/Applifier/go-bloomd)
 
 # go-bloomd
