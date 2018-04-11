@@ -9,11 +9,8 @@ import (
 	"testing"
 )
 
+// BloomdAddrs returns a list of bloomd addrs for testing
 var BloomdAddrs = addrsFromEnv
-
-func UseAddrsFromEnv() {
-	BloomdAddrs = addrsFromEnv
-}
 
 var envAddr []string
 var envAddrOnce sync.Once
@@ -52,6 +49,7 @@ func getEnv(name string, def string) string {
 	return val
 }
 
+// TestForAllAddrs allows to run tests against all bloomd addrs
 func TestForAllAddrs(t *testing.T, f func(*url.URL, *testing.T)) {
 	for _, addr := range BloomdAddrs() {
 		url := ParseURL(t, addr)
