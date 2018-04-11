@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+
+	"github.com/Applifier/go-bloomd/utils/testutils"
 )
 
 func TestFilter(t *testing.T) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		t.Run("Test address "+addr, func(t *testing.T) {
 			c := createClientFromString(t, addr)
 
@@ -72,7 +74,7 @@ func TestFilter(t *testing.T) {
 					}
 				})
 
-				t.Run("get multiple keys", func(t *testing.T) {
+				t.Run("check multiple keys", func(t *testing.T) {
 					set := keySetPool.GetKeySet()
 					defer keySetPool.PutKeySet(set)
 					set.AddKey(Key("foo"))
@@ -111,9 +113,9 @@ func next(t *testing.T, reader ResultReader) bool {
 const maxParallelism = 10
 
 func BenchmarkParallelFilterOperations(b *testing.B) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		b.Run("Test address "+addr, func(b *testing.B) {
-			url := parseBloomdURL(b, addr)
+			url := testutils.ParseURL(b, addr)
 			filterName := fmt.Sprintf("%s_benchmark_parallel_filter", url.Scheme)
 
 			createClientAndFilter := func(b *testing.B, filterName string) (*Client, Filter) {
@@ -175,11 +177,9 @@ func BenchmarkParallelFilterOperations(b *testing.B) {
 }
 
 func BenchmarkBatchFilterOperations(b *testing.B) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		b.Run("Test address "+addr, func(b *testing.B) {
 			c := createClientFromString(b, addr)
-
-			ksPool := NewKeySetPool()
 
 			batchLengths := []int{10, 50, 100, 500}
 			for _, batchLength := range batchLengths {
@@ -187,10 +187,8 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 					return fmt.Sprintf("%s_%d", name, batchLength)
 				}
 
-				ks := ksPool.GetKeySet()
-				for i := 0; i < batchLength; i++ {
-					ks.AddKey(Key(fmt.Sprintf("%s_%d_%d", "key", batchLength, b.N)))
-				}
+				ks := generateSeqKeySet(batchLength)
+				readResults := make([]bool, batchLength)
 
 				b.Run(fmt.Sprintf("BulkSet_%d", batchLength), func(b *testing.B) {
 					f := createBenchmarkFilter(b, c, suffixFilter("benchmark_filter_bulkset"))
@@ -200,6 +198,10 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 
 					for i := 0; i < b.N; i++ {
 						rr, err := f.BulkSet(ks)
+						if err != nil {
+							b.Fatal(err)
+						}
+						_, err = rr.Read(readResults)
 						if err != nil {
 							b.Fatal(err)
 						}
@@ -218,6 +220,10 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 						if err != nil {
 							b.Fatal(err)
 						}
+						_, err = rr.Read(readResults)
+						if err != nil {
+							b.Fatal(err)
+						}
 						rr.Close()
 					}
 				})
@@ -229,7 +235,7 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 }
 
 func BenchmarkFilterOperations(b *testing.B) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		b.Run("Test address "+addr, func(b *testing.B) {
 			c := createClientFromString(b, addr)
 
@@ -293,6 +299,15 @@ func BenchmarkFilterOperations(b *testing.B) {
 			closeClient(b, c)
 		})
 	}
+}
+
+func generateSeqKeySet(count int) *KeySet {
+	ksPool := NewKeySetPool()
+	ks := ksPool.GetKeySet()
+	for i := 0; i < count; i++ {
+		ks.AddKey(Key(fmt.Sprintf("key_%d", i)))
+	}
+	return ks
 }
 
 func generateSeqKeys(count int) []Key {

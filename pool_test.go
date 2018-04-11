@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+
+	"github.com/Applifier/go-bloomd/utils/testutils"
 )
 
 func TestPool(t *testing.T) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		t.Run("Test address "+addr, func(t *testing.T) {
-			pool, err := NewPoolFromURL(5, 10, parseBloomdURL(t, addr))
+			pool, err := NewPoolFromURL(5, 10, testutils.ParseURL(t, addr))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -43,9 +45,9 @@ func TestPool(t *testing.T) {
 }
 
 func BenchmarkPool(b *testing.B) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		b.Run("Test address "+addr, func(b *testing.B) {
-			pool, err := NewPoolFromURL(30, 50, parseBloomdURL(b, addr))
+			pool, err := NewPoolFromURL(30, 50, testutils.ParseURL(b, addr))
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -65,9 +67,9 @@ func BenchmarkPool(b *testing.B) {
 }
 
 func BenchmarkPoolParallel(b *testing.B) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		b.Run("Test address "+addr, func(b *testing.B) {
-			url := parseBloomdURL(b, addr)
+			url := testutils.ParseURL(b, addr)
 			b.Run("GetFromPool", func(b *testing.B) {
 				pool, err := NewPoolFromURL(30, 50, url)
 				if err != nil {

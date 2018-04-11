@@ -91,14 +91,15 @@ func (cli *Client) ListFilters() ([]Filter, error) {
 		return nil, err
 	}
 
-	filterNames, err := cli.readList()
+	filterLines, err := cli.readList()
 	if err != nil {
 		return nil, err
 	}
 
-	filters := make([]Filter, len(filterNames))
-	for i, filter := range filterNames {
-		filters[i] = cli.GetFilter(filter)
+	filters := make([]Filter, len(filterLines))
+	for i, filterLine := range filterLines {
+		filterName := strings.Fields(filterLine)[0]
+		filters[i] = cli.GetFilter(filterName)
 	}
 
 	return filters, nil
@@ -114,7 +115,10 @@ func (cli *Client) GetFilter(name string) Filter {
 
 // CreateFilter creates a new filter or returns an existing one
 func (cli *Client) CreateFilter(name string, capacity int, prob float64, inMemory bool) (Filter, error) {
-	f := cli.GetFilter(name)
+	f := Filter{
+		Name:   name,
+		client: cli,
+	}
 
 	if prob > 0 && capacity < 1 {
 		return f, Error{

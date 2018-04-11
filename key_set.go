@@ -7,6 +7,7 @@ import (
 
 const keyPartsDelimeter byte = ';'
 const initialKeyBufferCapacity = 32
+const initialKeySetCapacity = 512
 
 // Key is bloom filter key
 type Key []byte
@@ -90,26 +91,29 @@ const keysDelimeter byte = ' '
 
 // KeySet is a set of keys
 type KeySet struct {
-	buffer *bytes.Buffer
-	n      int
+	set []byte
+	n   int
 }
 
 // AddKey adds key to keyset
 func (p *KeySet) AddKey(key Key) {
-	p.buffer.Write(key)
-	p.buffer.WriteByte(keysDelimeter)
+	if p.n > 0 {
+		p.set = append(p.set, keysDelimeter)
+	}
+	p.set = append(p.set, key...)
 	p.n++
 	// we could probably return key to buffer here but it also can be reused in the same application block
 }
 
 // Length returns a number of keys in the key set
-func (p KeySet) Length() int {
+func (p *KeySet) Length() int {
 	return p.n
 }
 
 // Empty removes all keys from the key set, allowing to reuse it
 func (p *KeySet) Empty() {
-	p.buffer.Reset()
+	p.set = p.set[:0]
+	p.n = 0
 }
 
 // KeySetPool key set pool
@@ -122,9 +126,8 @@ func NewKeySetPool() *KeySetPool {
 	return &KeySetPool{
 		internal: sync.Pool{
 			New: func() interface{} {
-				var buffer bytes.Buffer
-				return KeySet{
-					buffer: &buffer,
+				return &KeySet{
+					set: make([]byte, 0, initialKeySetCapacity),
 				}
 			},
 		},
@@ -132,13 +135,13 @@ func NewKeySetPool() *KeySetPool {
 }
 
 // GetKeySet get a key set from a pool and empties it
-func (p *KeySetPool) GetKeySet() KeySet {
-	b := p.internal.Get().(KeySet)
+func (p *KeySetPool) GetKeySet() *KeySet {
+	b := p.internal.Get().(*KeySet)
 	b.Empty()
 	return b
 }
 
 // PutKeySet return keyset to a pool
-func (p *KeySetPool) PutKeySet(ks KeySet) {
+func (p *KeySetPool) PutKeySet(ks *KeySet) {
 	p.internal.Put(ks)
 }
