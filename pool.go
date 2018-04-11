@@ -44,9 +44,9 @@ func NewPoolFromFactory(initialCap, maxCap int, factory Factory) (*Pool, error) 
 
 	clientStructPool := &sync.Pool{}
 	clientStructPool.New = func() interface{} {
-		return &Client{
-			clientPool: clientStructPool,
-		}
+		cli := newClient()
+		cli.clientPool = clientStructPool
+		return cli
 	}
 
 	return &Pool{

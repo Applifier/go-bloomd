@@ -2,28 +2,27 @@ package bloomd
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
 )
 
-var bloomdAddr string
+var bloomdAddrs []string
 
 func TestMain(m *testing.M) {
+	sList := getSchemaList()
+	bloomdAddrs = make([]string, 0, len(sList))
 	for _, schema := range getSchemaList() {
-		bloomdAddr = getBloomdAddr(schema)
-		log.Printf("Bloomd addr: %s", bloomdAddr)
-		if code := m.Run(); code != 0 {
-			os.Exit(code)
-		}
+		bloomdAddrs = append(bloomdAddrs, getBloomdAddr(schema))
+
 	}
-	os.Exit(0)
+	code := m.Run()
+	os.Exit(code)
 }
 
-func getBloomdURL(tb testing.TB) *url.URL {
-	u, err := url.Parse(bloomdAddr)
+func parseBloomdURL(tb testing.TB, addr string) *url.URL {
+	u, err := url.Parse(addr)
 	if err != nil {
 		tb.Fatal(err)
 	}
