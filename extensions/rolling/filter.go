@@ -14,6 +14,7 @@ const (
 	RollMonthly = "m"
 )
 
+// Filter privides fuctionality of working with multiple sequential filters through time
 type Filter struct {
 	namer  Namer
 	period int
@@ -22,6 +23,10 @@ type Filter struct {
 	rs     resultsSet
 }
 
+// NewFilter creates a new Filter
+// unit - unit of time, e.g. Week, Day or Month. All keys being set during period with a same unit will be stored in a single filter.
+// period - period in specified time units to consider in check operations
+// namer - provides algorithm to name filters according to specified unit of time
 func NewFilter(namer Namer, unit string, period int, client *bloomd.Client) *Filter {
 	return &Filter{
 		namer:  namer,
@@ -32,12 +37,16 @@ func NewFilter(namer Namer, unit string, period int, client *bloomd.Client) *Fil
 	}
 }
 
+// BulkSet sets keys to filter that corresponds to a lates unit
+// note that it does not check if filter exists
 func (rf *Filter) BulkSet(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
 	currUnit := rf.currUnit()
 	f := rf.client.GetFilter(rf.nameForUnit(currUnit))
 	return f.BulkSet(ks)
 }
 
+// MultiCheck sequentially checks filters through period
+// note that it does not check if filters exist
 func (rf *Filter) MultiCheck(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
 	currUnit := rf.currUnit()
 	rf.rs.reset(ks.Length())
@@ -60,12 +69,16 @@ func (rf *Filter) MultiCheck(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
 	return &rf.rs, nil
 }
 
+// Set sets key to filter that corresponds to a lates unit
+// note that it does not check if filter exists
 func (rf *Filter) Set(k bloomd.Key) (bool, error) {
 	currUnit := rf.currUnit()
 	f := rf.client.GetFilter(rf.nameForUnit(currUnit))
 	return f.Set(k)
 }
 
+// Check sequentially checks filters through period
+// note that it does not check if filters exist
 func (rf *Filter) Check(k bloomd.Key) (bool, error) {
 	currUnit := rf.currUnit()
 	for i := 0; i < rf.period; i++ {
@@ -81,31 +94,40 @@ func (rf *Filter) Check(k bloomd.Key) (bool, error) {
 	return false, nil
 }
 
+// Drop drops all filters through period
 func (rf *Filter) Drop() error {
 	return rf.executeForAllFilters(func(f bloomd.Filter) error {
 		return f.Drop()
 	})
 }
 
+// Close closes all filters through period
 func (rf *Filter) Close() error {
 	return rf.executeForAllFilters(func(f bloomd.Filter) error {
 		return f.Close()
 	})
 }
 
+// Clear clears all filters through period
 func (rf *Filter) Clear() error {
 	return rf.executeForAllFilters(func(f bloomd.Filter) error {
 		return f.Clear()
 	})
 }
 
+// Flush flushes all filters through period
 func (rf *Filter) Flush() error {
 	return rf.executeForAllFilters(func(f bloomd.Filter) error {
 		return f.Flush()
 	})
 }
 
+// CreateFilters creates all filters through a specified period
+// if advance is greater than 0 that it will preallocate filters
 func (rf *Filter) CreateFilters(advance int, capacity int, prob float64, inMemory bool) error {
+	if advance < 0 {
+		advance = 0
+	}
 	currUnit := rf.currUnit()
 	for i := -rf.period + 1; i <= advance; i++ {
 		name := rf.nameForUnit(currUnit + i)
@@ -117,7 +139,12 @@ func (rf *Filter) CreateFilters(advance int, capacity int, prob float64, inMemor
 	return nil
 }
 
+// DropOlderFilters drops all filters that correspond to units older that period
+// if tail is greater that 0 that it will preserve some old filters
 func (rf *Filter) DropOlderFilters(tail int) error {
+	if tail < 0 {
+		tail = 0
+	}
 	filters, err := rf.findFilters()
 	if err != nil {
 		return err

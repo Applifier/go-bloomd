@@ -314,7 +314,7 @@ func createBenchFilter(b *testing.B, c *bloomd.Client, prefix string, period int
 func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period int, unit string) *Filter {
 	namer := NewNamer(prefix, unit)
 	rf := NewFilter(namer, unit, period, c)
-	err := rf.CreateFilters(2, 0, 0, true)
+	err := rf.CreateFilters(0, 0, 0, true)
 	if err != nil {
 		tb.Fatal(err)
 	}

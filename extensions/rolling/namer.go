@@ -6,11 +6,13 @@ import (
 	"sync"
 )
 
+// Namer maps filter names to units
 type Namer interface {
 	NameFor(unit int) string
 	ParseUnit(name string) (int, bool)
 }
 
+// NewNamer creates a new namer with names cache
 func NewNamer(prefix string, unit string) Namer {
 	return &namer{
 		cache:  make(map[int]string),
@@ -25,6 +27,8 @@ type namer struct {
 	m      sync.RWMutex
 }
 
+// NameFor resolves name for specified unit
+// it checks and updates cache if corresponding name were not found
 func (nr *namer) NameFor(unit int) string {
 	name, ok := nr.readCache(unit)
 	if !ok {
@@ -34,6 +38,7 @@ func (nr *namer) NameFor(unit int) string {
 	return name
 }
 
+// ParseUnit attemts tp resolve unit from provided filter name
 func (nr *namer) ParseUnit(name string) (int, bool) {
 	if len(name) > len(nr.prefix) && name[:len(nr.prefix)] == nr.prefix {
 		unit, err := strconv.Atoi(name[len(nr.prefix):])
