@@ -58,3 +58,13 @@ func TestForAllAddrs(t *testing.T, f func(*url.URL, *testing.T)) {
 		})
 	}
 }
+
+// BenchForAllAddrs allows to run benchmarks against all bloomd addrs
+func BenchForAllAddrs(b *testing.B, f func(*url.URL, *testing.B)) {
+	for _, addr := range BloomdAddrs() {
+		url := ParseURL(b, addr)
+		b.Run("Test address "+addr, func(b *testing.B) {
+			f(url, b)
+		})
+	}
+}
