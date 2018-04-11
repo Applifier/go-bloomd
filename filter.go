@@ -11,6 +11,8 @@ type Filter struct {
 	client *Client
 }
 
+var yes = []byte("Yes")
+
 // BulkSet adds multiple keys to the filter
 func (f Filter) BulkSet(keyset *KeySet) (ResultReader, error) {
 	err := f.sendBatchOp("b", keyset)
