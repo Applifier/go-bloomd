@@ -8,44 +8,63 @@ import (
 
 var now = time.Now
 
+// Now returns clocks now
 func Now() time.Time {
 	return now()
 }
 
+// Reset resets now function to get real current time
 func Reset() {
 	now = time.Now
 }
 
+// Custom replaces a current time function with custome f for clocks now
 func Custom(f func() time.Time) {
 	now = f
 }
 
+// Static fixes clocks now function to return value t
 func Static(t time.Time) {
 	now = func() time.Time {
 		return t
 	}
 }
 
-func WeekNum() int {
+// Unit represents a unit of time, like day, hour, year and etc.
+type Unit string
+
+// UnitNum is a value of particular Unit from the zero unix time, for example 3d week or 2nd year
+type UnitNum uint32
+
+// UnitZero is zero UnitNum
+const UnitZero = UnitNum(0)
+
+// WeekNum return current week number
+func WeekNum() UnitNum {
 	return WeekNumOf(Now())
 }
 
-func MonthNum() int {
+// MonthNum return current month number
+func MonthNum() UnitNum {
 	return MonthNumOf(Now())
 }
 
-func DayNum() int {
+// DayNum return current day number
+func DayNum() UnitNum {
 	return DayNumOf(Now())
 }
 
-func WeekNumOf(t time.Time) int {
+// WeekNumOf returns week number of specified time t
+func WeekNumOf(t time.Time) UnitNum {
 	return DayNumOf(t) / period.DaysInWeek
 }
 
-func MonthNumOf(t time.Time) int {
-	return int(t.Month()) + t.Year()*12
+// MonthNumOf returns month number of specified time t
+func MonthNumOf(t time.Time) UnitNum {
+	return UnitNum(int(t.Month()) + t.Year()*12)
 }
 
-func DayNumOf(t time.Time) int {
-	return int(t.UnixNano() / int64(period.Day))
+// DayNumOf returns day number of specified time t
+func DayNumOf(t time.Time) UnitNum {
+	return UnitNum(t.UnixNano() / int64(period.Day))
 }

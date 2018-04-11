@@ -49,6 +49,7 @@ func createClientFromString(tb testing.TB, addr string) *Client {
 }
 
 func createClientFromURL(tb testing.TB, addr *url.URL) *Client {
+	tb.Helper()
 	c, err := NewFromURL(addr)
 	if err != nil {
 		tb.Fatal(err)
@@ -57,6 +58,7 @@ func createClientFromURL(tb testing.TB, addr *url.URL) *Client {
 }
 
 func closeClient(tb testing.TB, c *Client) {
+	tb.Helper()
 	if err := c.Close(); err != nil {
 		tb.Fatal(err)
 	}

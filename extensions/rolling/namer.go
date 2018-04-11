@@ -4,32 +4,34 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+
+	"github.com/Applifier/go-bloomd/utils/clock"
 )
 
 // Namer maps filter names to units
 type Namer interface {
-	NameFor(unit int) string
-	ParseUnit(name string) (int, bool)
+	NameFor(unit clock.UnitNum) string
+	ParseUnit(name string) (clock.UnitNum, bool)
 }
 
 // NewNamer creates a new namer with names cache
-func NewNamer(prefix string, unit string) Namer {
+func NewNamer(prefix string, unit clock.Unit) Namer {
 	return &namer{
-		cache:  make(map[int]string),
-		prefix: prefix + "-" + unit,
+		cache:  make(map[clock.UnitNum]string),
+		prefix: prefix + "-" + string(unit),
 		m:      sync.RWMutex{},
 	}
 }
 
 type namer struct {
-	cache  map[int]string
+	cache  map[clock.UnitNum]string
 	prefix string
 	m      sync.RWMutex
 }
 
 // NameFor resolves name for specified unit
 // it checks and updates cache if corresponding name were not found
-func (nr *namer) NameFor(unit int) string {
+func (nr *namer) NameFor(unit clock.UnitNum) string {
 	name, ok := nr.readCache(unit)
 	if !ok {
 		name = fmt.Sprintf("%s%d", nr.prefix, unit)
@@ -39,24 +41,24 @@ func (nr *namer) NameFor(unit int) string {
 }
 
 // ParseUnit attemts tp resolve unit from provided filter name
-func (nr *namer) ParseUnit(name string) (int, bool) {
+func (nr *namer) ParseUnit(name string) (clock.UnitNum, bool) {
 	if len(name) > len(nr.prefix) && name[:len(nr.prefix)] == nr.prefix {
 		unit, err := strconv.Atoi(name[len(nr.prefix):])
 		if err == nil {
-			return unit, true
+			return clock.UnitNum(unit), true
 		}
 	}
-	return 0, false
+	return clock.UnitZero, false
 }
 
-func (nr *namer) readCache(unit int) (string, bool) {
+func (nr *namer) readCache(unit clock.UnitNum) (string, bool) {
 	nr.m.RLock()
 	defer nr.m.RUnlock()
 	name, ok := nr.cache[unit]
 	return name, ok
 }
 
-func (nr *namer) writeCache(unit int, name string) {
+func (nr *namer) writeCache(unit clock.UnitNum, name string) {
 	nr.m.Lock()
 	defer nr.m.Unlock()
 	nr.cache[unit] = name

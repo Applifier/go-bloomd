@@ -311,6 +311,7 @@ func generateSeqKeys(count int) []Key {
 }
 
 func createBenchmarkFilter(b *testing.B, url *url.URL, c *Client, name string) Filter {
+	b.Helper()
 	f, err := c.CreateFilter(fmt.Sprintf("run_%s_u%s_b%d", name, url.Scheme, b.N), 0, 0, true)
 	if err != nil {
 		b.Fatal(err)
@@ -319,6 +320,7 @@ func createBenchmarkFilter(b *testing.B, url *url.URL, c *Client, name string) F
 }
 
 func dropFilter(b *testing.B, f Filter) {
+	b.Helper()
 	if err := f.Drop(); err != nil {
 		b.Fatal(err)
 	}

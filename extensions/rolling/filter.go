@@ -7,18 +7,18 @@ import (
 
 const (
 	// RollDaily roll filter every day
-	RollDaily = "d"
+	RollDaily = clock.Unit("d")
 	// RollWeekly roll filter every week
-	RollWeekly = "w"
+	RollWeekly = clock.Unit("w")
 	// RollMonthly roll filter every month
-	RollMonthly = "m"
+	RollMonthly = clock.Unit("m")
 )
 
-// Filter privides fuctionality of working with multiple sequential filters through time
+// Filter provides fuctionality of working with multiple sequential filters through time
 type Filter struct {
 	namer  Namer
-	period int
-	unit   string
+	period clock.UnitNum
+	unit   clock.Unit
 	client *bloomd.Client
 	rs     resultsSet
 }
@@ -27,7 +27,7 @@ type Filter struct {
 // unit - unit of time, e.g. Week, Day or Month. All keys being set during period with a same unit will be stored in a single filter.
 // period - period in specified time units to consider in check operations
 // namer - provides algorithm to name filters according to specified unit of time
-func NewFilter(namer Namer, unit string, period int, client *bloomd.Client) *Filter {
+func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum, client *bloomd.Client) *Filter {
 	return &Filter{
 		namer:  namer,
 		unit:   unit,
@@ -50,7 +50,7 @@ func (rf *Filter) BulkSet(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
 func (rf *Filter) MultiCheck(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
 	currUnit := rf.currUnit()
 	rf.rs.reset(ks.Length())
-	for i := 0; i < rf.period; i++ {
+	for i := clock.UnitZero; i < rf.period; i++ {
 		f := rf.client.GetFilter(rf.nameForUnit(currUnit - i))
 		reader, err := f.MultiCheck(ks)
 		if err != nil {
@@ -81,7 +81,7 @@ func (rf *Filter) Set(k bloomd.Key) (bool, error) {
 // note that it does not check if filters exist
 func (rf *Filter) Check(k bloomd.Key) (bool, error) {
 	currUnit := rf.currUnit()
-	for i := 0; i < rf.period; i++ {
+	for i := clock.UnitZero; i < rf.period; i++ {
 		f := rf.client.GetFilter(rf.nameForUnit(currUnit - i))
 		val, err := f.Check(k)
 		if err != nil {
@@ -124,13 +124,15 @@ func (rf *Filter) Flush() error {
 
 // CreateFilters creates all filters through a specified period
 // if advance is greater than 0 that it will preallocate filters
-func (rf *Filter) CreateFilters(advance int, capacity int, prob float64, inMemory bool) error {
+func (rf *Filter) CreateFilters(advance clock.UnitNum, capacity int, prob float64, inMemory bool) error {
 	if advance < 0 {
 		advance = 0
 	}
 	currUnit := rf.currUnit()
-	for i := -rf.period + 1; i <= advance; i++ {
-		name := rf.nameForUnit(currUnit + i)
+	from := currUnit - rf.period + 1
+	to := currUnit + advance
+	for i := from; i <= to; i++ {
+		name := rf.nameForUnit(i)
 		_, err := rf.client.CreateFilter(name, capacity, prob, inMemory)
 		if err != nil {
 			return err
@@ -141,7 +143,7 @@ func (rf *Filter) CreateFilters(advance int, capacity int, prob float64, inMemor
 
 // DropOlderFilters drops all filters that correspond to units older that period
 // if tail is greater that 0 that it will preserve some old filters
-func (rf *Filter) DropOlderFilters(tail int) error {
+func (rf *Filter) DropOlderFilters(tail clock.UnitNum) error {
 	if tail < 0 {
 		tail = 0
 	}
@@ -197,10 +199,10 @@ func (rf *Filter) findFilters() ([]unitFilter, error) {
 
 type unitFilter struct {
 	filter bloomd.Filter
-	unit   int
+	unit   clock.UnitNum
 }
 
-func (rf *Filter) currUnit() int {
+func (rf *Filter) currUnit() clock.UnitNum {
 	switch rf.unit {
 	case RollDaily:
 		return clock.DayNum()
@@ -212,6 +214,6 @@ func (rf *Filter) currUnit() int {
 	return 0
 }
 
-func (rf *Filter) nameForUnit(unit int) string {
+func (rf *Filter) nameForUnit(unit clock.UnitNum) string {
 	return rf.namer.NameFor(unit)
 }

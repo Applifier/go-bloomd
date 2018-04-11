@@ -14,7 +14,7 @@ import (
 	"github.com/Applifier/go-bloomd/utils/testutils"
 )
 
-var units = []string{RollDaily, RollMonthly, RollWeekly}
+var units = []clock.Unit{RollDaily, RollMonthly, RollWeekly}
 
 func TestOperations(t *testing.T) {
 	testutils.TestForAllAddrs(t, func(url *url.URL, t *testing.T) {
@@ -179,7 +179,7 @@ func BenchmarkOperations(b *testing.B) {
 		url := testutils.ParseURL(b, addr)
 		b.Run("Test address "+addr, func(b *testing.B) {
 			c := createClientFromURL(b, url)
-			periods := []int{1, 5, 10}
+			periods := []clock.UnitNum{1, 5, 10}
 			ks := generateSeqKeySet(100)
 			readResults := make([]bool, 100)
 			for _, period := range periods {
@@ -226,6 +226,7 @@ func BenchmarkOperations(b *testing.B) {
 }
 
 func checkFilterDoesNotExists(t *testing.T, c *bloomd.Client, name string) {
+	t.Helper()
 	if err := testutils.Eventually(func() error {
 		fs, err := c.ListFilters()
 		if err != nil {
@@ -243,6 +244,7 @@ func checkFilterDoesNotExists(t *testing.T, c *bloomd.Client, name string) {
 }
 
 func checkFilterExists(t *testing.T, c *bloomd.Client, name string) {
+	t.Helper()
 	f := c.GetFilter(name)
 	_, err := f.Info()
 	if err != nil {
@@ -251,6 +253,7 @@ func checkFilterExists(t *testing.T, c *bloomd.Client, name string) {
 }
 
 func setShouldAddNew(t *testing.T, rf *Filter, key string) {
+	t.Helper()
 	isNew, err := rf.Set(bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
@@ -261,6 +264,7 @@ func setShouldAddNew(t *testing.T, rf *Filter, key string) {
 }
 
 func bulkSetShouldlNotFail(t *testing.T, rf *Filter, keys ...string) bloomd.ResultReader {
+	t.Helper()
 	set := keySet(keys...)
 	results, err := rf.BulkSet(set)
 	if err != nil {
@@ -270,6 +274,7 @@ func bulkSetShouldlNotFail(t *testing.T, rf *Filter, keys ...string) bloomd.Resu
 }
 
 func multiCheckShouldlNotFail(t *testing.T, rf *Filter, keys ...string) bloomd.ResultReader {
+	t.Helper()
 	set := keySet(keys...)
 	results, err := rf.MultiCheck(set)
 	if err != nil {
@@ -288,6 +293,7 @@ func keySet(keys ...string) *bloomd.KeySet {
 }
 
 func checkShouldFind(t *testing.T, rf *Filter, key string) {
+	t.Helper()
 	b, err := rf.Check(bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
@@ -298,6 +304,7 @@ func checkShouldFind(t *testing.T, rf *Filter, key string) {
 }
 
 func checkShouldNotFind(t *testing.T, rf *Filter, key string) {
+	t.Helper()
 	b, err := rf.Check(bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
@@ -307,11 +314,13 @@ func checkShouldNotFind(t *testing.T, rf *Filter, key string) {
 	}
 }
 
-func createBenchFilter(b *testing.B, c *bloomd.Client, prefix string, period int, unit string) *Filter {
+func createBenchFilter(b *testing.B, c *bloomd.Client, prefix string, period clock.UnitNum, unit clock.Unit) *Filter {
+	b.Helper()
 	return createFilter(b, c, fmt.Sprintf("%s_%d", prefix, b.N), period, unit)
 }
 
-func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period int, unit string) *Filter {
+func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period clock.UnitNum, unit clock.Unit) *Filter {
+	tb.Helper()
 	namer := NewNamer(prefix, unit)
 	rf := NewFilter(namer, unit, period, c)
 	err := rf.CreateFilters(0, 0, 0, true)
@@ -322,6 +331,7 @@ func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period int, un
 }
 
 func dropFilter(tb testing.TB, rf *Filter) error {
+	tb.Helper()
 	if err := rf.Drop(); err != nil {
 		tb.Fatal(err)
 	}
@@ -329,6 +339,7 @@ func dropFilter(tb testing.TB, rf *Filter) error {
 }
 
 func createClientFromURL(tb testing.TB, addr *url.URL) *bloomd.Client {
+	tb.Helper()
 	c, err := bloomd.NewFromURL(addr)
 	if err != nil {
 		tb.Fatal(err)
@@ -337,12 +348,14 @@ func createClientFromURL(tb testing.TB, addr *url.URL) *bloomd.Client {
 }
 
 func closeClient(tb testing.TB, c *bloomd.Client) {
+	tb.Helper()
 	if err := c.Close(); err != nil {
 		tb.Fatal(err)
 	}
 }
 
 func next(t *testing.T, reader bloomd.ResultReader) bool {
+	t.Helper()
 	next, err := reader.Next()
 	if err != nil {
 		t.Fatal(err)
