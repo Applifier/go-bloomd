@@ -92,7 +92,6 @@ func BenchmarkPoolParallel(b *testing.B) {
 			})
 
 			b.Run("SetCheck", func(b *testing.B) {
-				filterName := fmt.Sprintf("%s_benchmark_parallel_pool", url.Scheme)
 
 				pool, err := NewPoolFromURL(30, 100, url)
 				if err != nil {
@@ -104,7 +103,8 @@ func BenchmarkPoolParallel(b *testing.B) {
 					b.Fatal(err)
 				}
 
-				f := createBenchmarkFilter(b, c, filterName)
+				f := createBenchmarkFilter(b, c, fmt.Sprintf("%s_benchmark_parallel_pool", url.Scheme))
+				filterName := f.Name
 
 				c.Close()
 
