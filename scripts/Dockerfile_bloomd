@@ -7,7 +7,7 @@ RUN apt-get update && \
 
 RUN \
   mkdir -p /tmp/bloomd /data /etc/bloomd && \
-  git clone https://github.com/Applifier/bloomd /tmp/bloomd -b bugfix/non-blocking-accept && \
+  git clone https://github.com/Applifier/bloomd /tmp/bloomd && \
   cd /tmp/bloomd && \
   scons && scons test_bloomd_runner && \
   ./test_bloomd_runner && \
