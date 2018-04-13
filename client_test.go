@@ -3,10 +3,12 @@ package bloomd
 import (
 	"net/url"
 	"testing"
+
+	"github.com/Applifier/go-bloomd/utils/testutils"
 )
 
 func TestClientConnect(t *testing.T) {
-	for _, addr := range bloomdAddrs {
+	for _, addr := range testutils.BloomdAddrs() {
 		t.Run("Test address "+addr, func(t *testing.T) {
 			c := createClientFromString(t, addr)
 			defer closeClient(t, c)
@@ -43,10 +45,11 @@ func TestClientConnectionError(t *testing.T) {
 }
 
 func createClientFromString(tb testing.TB, addr string) *Client {
-	return createClientFromURL(tb, parseBloomdURL(tb, addr))
+	return createClientFromURL(tb, testutils.ParseURL(tb, addr))
 }
 
 func createClientFromURL(tb testing.TB, addr *url.URL) *Client {
+	tb.Helper()
 	c, err := NewFromURL(addr)
 	if err != nil {
 		tb.Fatal(err)
@@ -55,6 +58,7 @@ func createClientFromURL(tb testing.TB, addr *url.URL) *Client {
 }
 
 func closeClient(tb testing.TB, c *Client) {
+	tb.Helper()
 	if err := c.Close(); err != nil {
 		tb.Fatal(err)
 	}

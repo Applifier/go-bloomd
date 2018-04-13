@@ -14,37 +14,32 @@ type Filter struct {
 var yes = []byte("Yes")
 
 // BulkSet adds multiple keys to the filter
-func (f Filter) BulkSet(keyset KeySet) (ResultReader, error) {
+func (f Filter) BulkSet(keyset *KeySet) (ResultReader, error) {
 	err := f.sendBatchOp("b", keyset)
 	if err != nil {
 		return nil, f.client.handleWriteError(err)
 	}
 
-	return f.receiveBatchResponse(keyset.Length())
+	return f.readerFor(keyset.Length()), nil
 }
 
 // MultiCheck checks multiple keys for the filter
-func (f Filter) MultiCheck(keyset KeySet) (ResultReader, error) {
+func (f Filter) MultiCheck(keyset *KeySet) (ResultReader, error) {
 	err := f.sendBatchOp("m", keyset)
 	if err != nil {
 		return nil, f.client.handleWriteError(err)
 	}
 
-	return f.receiveBatchResponse(keyset.Length())
+	return f.readerFor(keyset.Length()), nil
 }
 
-func (f Filter) receiveBatchResponse(resultLength int) (ResultReader, error) {
-	f.client.resultReader.resetLength(resultLength)
-	return f.client.resultReader, nil
-}
-
-func (f Filter) sendBatchOp(op string, keyset KeySet) error {
+func (f Filter) sendBatchOp(op string, keyset *KeySet) error {
 	w := f.client.writer
 	w.WriteString(op)
 	w.WriteByte(itemDelimeter)
 	w.WriteString(f.Name)
 	w.WriteByte(itemDelimeter)
-	w.ReadFrom(keyset.buffer)
+	w.Write(keyset.set)
 	w.WriteByte(cmdDelimeter)
 	return w.Flush()
 }
@@ -97,7 +92,7 @@ func (f Filter) Set(key Key) (bool, error) {
 		return false, f.client.handleWriteError(err)
 	}
 
-	return f.client.resultReader.readLastResult()
+	return f.readSingle()
 }
 
 // Check gets a single key to the bloom
@@ -107,7 +102,7 @@ func (f Filter) Check(key Key) (bool, error) {
 		return false, f.client.handleWriteError(err)
 	}
 
-	return f.client.resultReader.readLastResult()
+	return f.readSingle()
 }
 
 func (f Filter) sendSingleOp(op string, key Key) error {
@@ -119,6 +114,17 @@ func (f Filter) sendSingleOp(op string, key Key) error {
 	w.Write(key)
 	w.WriteByte(cmdDelimeter)
 	return w.Flush()
+}
+
+func (f Filter) readerFor(resultLength int) ResultReader {
+	f.client.resultReader.resetLength(resultLength)
+	return f.client.resultReader
+}
+
+func (f Filter) readSingle() (bool, error) {
+	r := f.readerFor(1)
+	defer r.Close()
+	return r.Next()
 }
 
 func checkResponse(resp string, err error) error {

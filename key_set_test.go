@@ -32,6 +32,26 @@ func TestKeyBuffer(t *testing.T) {
 	})
 }
 
+func TestKeySet(t *testing.T) {
+	ksPool := NewKeySetPool()
+	t.Run("Empty", func(t *testing.T) {
+		ks := ksPool.GetKeySet()
+		ks.AddKey(Key("Hello"))
+		ks.AddKey(Key("world!"))
+		ks.Empty()
+		ks.AddKey(Key("Hello"))
+		ks.AddKey(Key("world!"))
+		expected := "Hello world!"
+		actual := string(ks.set)
+		if expected != actual {
+			t.Fatalf("KeySet.set is expected to be equal %s but was %s", expected, actual)
+		}
+		if ks.Length() != 2 {
+			t.Fatalf("KeySet.n is expected to be equal %d but was %d", 2, ks.Length())
+		}
+	})
+}
+
 func BenchmarkKeyBuffer(b *testing.B) {
 	pool := NewKeyBufferPool()
 	b.Run("AddString", func(b *testing.B) {
