@@ -180,7 +180,7 @@ func BenchmarkOperations(b *testing.B) {
 		b.Run("Test address "+addr, func(b *testing.B) {
 			c := createClientFromURL(b, url)
 			periods := []clock.UnitNum{1, 5, 10}
-			ks := generateSeqKeySet(100)
+			ks := generateSeqKeyCollection(100)
 			readResults := make([]bool, 100)
 			for _, period := range periods {
 				b.Run(fmt.Sprintf("MultiCheck-p%d", period), func(b *testing.B) {
@@ -265,7 +265,7 @@ func setShouldAddNew(t *testing.T, rf *Filter, key string) {
 
 func bulkSetShouldlNotFail(t *testing.T, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
-	set := keySet(keys...)
+	set := keyCollection(keys...)
 	results, err := rf.BulkSet(set)
 	if err != nil {
 		t.Fatal(err)
@@ -275,7 +275,7 @@ func bulkSetShouldlNotFail(t *testing.T, rf *Filter, keys ...string) bloomd.Resu
 
 func multiCheckShouldlNotFail(t *testing.T, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
-	set := keySet(keys...)
+	set := keyCollection(keys...)
 	results, err := rf.MultiCheck(set)
 	if err != nil {
 		t.Fatal(err)
@@ -283,13 +283,12 @@ func multiCheckShouldlNotFail(t *testing.T, rf *Filter, keys ...string) bloomd.R
 	return results
 }
 
-func keySet(keys ...string) *bloomd.KeySet {
-	keySetPool := bloomd.NewKeySetPool()
-	set := keySetPool.GetKeySet()
+func keyCollection(keys ...string) KeyCollection {
+	var arr []bloomd.Key
 	for _, key := range keys {
-		set.AddKey(bloomd.Key(key))
+		arr = append(arr, bloomd.Key(key))
 	}
-	return set
+	return NewArrayCollection(arr...)
 }
 
 func checkShouldFind(t *testing.T, rf *Filter, key string) {
@@ -363,11 +362,10 @@ func next(t *testing.T, reader bloomd.ResultReader) bool {
 	return next
 }
 
-func generateSeqKeySet(count int) *bloomd.KeySet {
-	ksPool := bloomd.NewKeySetPool()
-	ks := ksPool.GetKeySet()
+func generateSeqKeyCollection(count int) KeyCollection {
+	var arr []bloomd.Key
 	for i := 0; i < count; i++ {
-		ks.AddKey(bloomd.Key(fmt.Sprintf("key_%d", i)))
+		arr = append(arr, bloomd.Key(fmt.Sprintf("key_%d", i)))
 	}
-	return ks
+	return NewArrayCollection(arr...)
 }

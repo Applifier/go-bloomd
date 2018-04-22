@@ -21,6 +21,7 @@ type Filter struct {
 	unit   clock.Unit
 	client *bloomd.Client
 	rs     resultsSet
+	cr     *CollectionReader
 }
 
 // NewFilter creates a new Filter
@@ -34,25 +35,28 @@ func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum, client *bloom
 		period: period,
 		client: client,
 		rs:     newResultSet(),
+		cr:     NewCollectionReader(EmptyKeyCollection),
 	}
 }
 
 // BulkSet sets keys to filter that corresponds to a lates unit
 // note that it does not check if filter exists
-func (rf *Filter) BulkSet(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
+func (rf *Filter) BulkSet(col KeyCollection) (bloomd.ResultReader, error) {
 	currUnit := rf.currUnit()
 	f := rf.client.GetFilter(rf.nameForUnit(currUnit))
-	return f.BulkSet(ks)
+	rf.cr.reset(col)
+	return f.BulkSet(rf.cr)
 }
 
 // MultiCheck sequentially checks filters through period
 // note that it does not check if filters exist
-func (rf *Filter) MultiCheck(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
+func (rf *Filter) MultiCheck(col KeyCollection) (bloomd.ResultReader, error) {
 	currUnit := rf.currUnit()
-	rf.rs.reset(ks.Length())
+	rf.rs.reset(col.Count())
 	for i := clock.UnitZero; i < rf.period; i++ {
 		f := rf.client.GetFilter(rf.nameForUnit(currUnit - i))
-		reader, err := f.MultiCheck(ks)
+		rf.cr.reset(col)
+		reader, err := f.MultiCheck(rf.cr)
 		if err != nil {
 			return nil, err
 		}
