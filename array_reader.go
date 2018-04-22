@@ -23,7 +23,7 @@ func (sr *ArrayReader) Next() bool {
 	return true
 }
 
-func (sr *ArrayReader) Current() Key {
+func (sr ArrayReader) Current() Key {
 	return sr.arr[sr.cur-1]
 }
 

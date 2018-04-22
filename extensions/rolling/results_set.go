@@ -34,7 +34,7 @@ func releaseResultSet(rs *resultsSet) {
 
 func (rs *resultsSet) fillFromReader(reader bloomd.ResultReader) error {
 	defer reader.Close()
-	for i := 0; i < rs.length(); i++ {
+	for i := 0; i < rs.Length(); i++ {
 		next, err := reader.Next()
 		if err != nil {
 			return err
@@ -46,7 +46,7 @@ func (rs *resultsSet) fillFromReader(reader bloomd.ResultReader) error {
 
 func (rs *resultsSet) mergeFromReader(reader bloomd.ResultReader) error {
 	defer reader.Close()
-	for i := 0; i < rs.length(); i++ {
+	for i := 0; i < rs.Length(); i++ {
 		next, err := reader.Next()
 		if err != nil {
 			return err
@@ -56,7 +56,7 @@ func (rs *resultsSet) mergeFromReader(reader bloomd.ResultReader) error {
 	return nil
 }
 
-func (rs *resultsSet) length() int {
+func (rs *resultsSet) Length() int {
 	return len(rs.internal)
 }
 
@@ -85,7 +85,7 @@ func (rs *resultsSet) or(i int, val bool) bool {
 
 func (rs *resultsSet) Next() (bool, error) {
 	rs.readerCursor++
-	if rs.readerCursor > rs.length() {
+	if rs.readerCursor > rs.Length() {
 		return false, io.EOF
 	}
 	return rs.internal[rs.readerCursor-1], nil

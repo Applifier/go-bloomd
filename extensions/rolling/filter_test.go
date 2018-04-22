@@ -181,7 +181,7 @@ func BenchmarkOperations(b *testing.B) {
 		b.Run("Test address "+addr, func(b *testing.B) {
 			c := createClientFromURL(b, url)
 			periods := []clock.UnitNum{1, 5, 10}
-			ks := generateSeqKeyCollection(100)
+			ks := generateSeqKeyReaderReseter(100)
 			readResults := make([]bool, 100)
 			for _, period := range periods {
 				b.Run(fmt.Sprintf("MultiCheck-p%d", period), func(b *testing.B) {
@@ -191,6 +191,7 @@ func BenchmarkOperations(b *testing.B) {
 					b.ResetTimer()
 
 					for i := 0; i < b.N; i++ {
+						ks.Reset()
 						rr, err := rf.MultiCheck(context.Background(), c, ks)
 						if err != nil {
 							b.Fatal(err)
@@ -210,7 +211,8 @@ func BenchmarkOperations(b *testing.B) {
 					b.ResetTimer()
 
 					for i := 0; i < b.N; i++ {
-						rr, err := rf.BulkSet(context.Background(), c, NewCollectionReader(ks))
+						ks.Reset()
+						rr, err := rf.BulkSet(context.Background(), c, ks)
 						if err != nil {
 							b.Fatal(err)
 						}
@@ -266,7 +268,7 @@ func setShouldAddNew(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 
 func bulkSetShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
-	set := NewCollectionReader(keyCollection(keys...))
+	set := readerReseter(keys...)
 	results, err := rf.BulkSet(context.Background(), c, set)
 	if err != nil {
 		t.Fatal(err)
@@ -276,7 +278,7 @@ func bulkSetShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...s
 
 func multiCheckShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
-	set := keyCollection(keys...)
+	set := readerReseter(keys...)
 	results, err := rf.MultiCheck(context.Background(), c, set)
 	if err != nil {
 		t.Fatal(err)
@@ -284,12 +286,12 @@ func multiCheckShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys .
 	return results
 }
 
-func keyCollection(keys ...string) KeyCollection {
+func readerReseter(keys ...string) KeyReaderReseter {
 	var arr []bloomd.Key
 	for _, key := range keys {
 		arr = append(arr, bloomd.Key(key))
 	}
-	return NewArrayCollection(arr...)
+	return NewArrayReaderReseter(arr...)
 }
 
 func checkShouldFind(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
@@ -363,10 +365,10 @@ func next(t *testing.T, reader bloomd.ResultReader) bool {
 	return next
 }
 
-func generateSeqKeyCollection(count int) KeyCollection {
+func generateSeqKeyReaderReseter(count int) KeyReaderReseter {
 	var arr []bloomd.Key
 	for i := 0; i < count; i++ {
 		arr = append(arr, bloomd.Key(fmt.Sprintf("key_%d", i)))
 	}
-	return NewArrayCollection(arr...)
+	return NewArrayReaderReseter(arr...)
 }
