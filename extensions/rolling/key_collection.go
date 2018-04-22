@@ -2,6 +2,7 @@ package rolling
 
 import (
 	"errors"
+	"sync"
 
 	bloomd "github.com/Applifier/go-bloomd"
 )
@@ -58,13 +59,33 @@ func (cr CollectionReader) Current() bloomd.Key {
 	return cr.col.GetBy(cr.cur - 1)
 }
 
+func (cr *CollectionReader) Reset() {
+	cr.cur = 0
+}
+
 func (cr *CollectionReader) reset(col KeyCollection) {
 	cr.col = col
-	cr.cur = 0
+	cr.Reset()
 }
 
 func NewCollectionReader(col KeyCollection) *CollectionReader {
 	return &CollectionReader{
 		col: col,
 	}
+}
+
+var colReaderPool = sync.Pool{
+	New: func() interface{} {
+		return &CollectionReader{}
+	},
+}
+
+func AccrueCollectionReader(col KeyCollection) *CollectionReader {
+	cr := colReaderPool.Get().(*CollectionReader)
+	cr.reset(col)
+	return cr
+}
+
+func ReleaseCollectionReader(cr *CollectionReader) {
+	colReaderPool.Put(cr)
 }

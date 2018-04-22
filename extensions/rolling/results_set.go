@@ -2,6 +2,7 @@ package rolling
 
 import (
 	"io"
+	"sync"
 
 	bloomd "github.com/Applifier/go-bloomd"
 )
@@ -9,6 +10,26 @@ import (
 type resultsSet struct {
 	internal     []bool
 	readerCursor int
+}
+
+const defaultResultSetLength = 100
+
+var resultSetPool = sync.Pool{
+	New: func() interface{} {
+		return &resultsSet{
+			internal: make([]bool, defaultResultSetLength, defaultResultSetLength),
+		}
+	},
+}
+
+func accrueResultSet(length int) *resultsSet {
+	rs := resultSetPool.Get().(*resultsSet)
+	rs.reset(length)
+	return rs
+}
+
+func releaseResultSet(rs *resultsSet) {
+	resultSetPool.Put(rs)
 }
 
 func (rs *resultsSet) fillFromReader(reader bloomd.ResultReader) error {
@@ -33,14 +54,6 @@ func (rs *resultsSet) mergeFromReader(reader bloomd.ResultReader) error {
 		rs.swapIf(i, next)
 	}
 	return nil
-}
-
-const defaultResultSetLength = 100
-
-func newResultSet() resultsSet {
-	return resultsSet{
-		internal: make([]bool, 100, 100),
-	}
 }
 
 func (rs *resultsSet) length() int {
@@ -85,5 +98,6 @@ func (rs *resultsSet) Read(p []bool) (int, error) {
 }
 
 func (rs *resultsSet) Close() error {
+	releaseResultSet(rs)
 	return nil
 }
