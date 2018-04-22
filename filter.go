@@ -39,11 +39,10 @@ func (f Filter) sendBatchOp(op string, reader KeyReader) (int, error) {
 	w.WriteString(op)
 	w.WriteByte(itemDelimeter)
 	w.WriteString(f.Name)
-	w.WriteByte(itemDelimeter)
 	for reader.Next() {
 		count++
-		w.Write(reader.Current())
 		w.WriteByte(itemDelimeter)
+		w.Write(reader.Current())
 	}
 	w.WriteByte(cmdDelimeter)
 	return count, w.Flush()

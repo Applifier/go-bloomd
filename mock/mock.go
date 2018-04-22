@@ -53,7 +53,7 @@ func (s *MockServer) Serve() {
 			panic(err)
 		}
 		response := s.handle(cmd)
-		if err := s.send([]byte(response + "\n")); err != nil {
+		if err := s.send([]byte(response)); err != nil {
 			panic(err)
 		}
 	}
