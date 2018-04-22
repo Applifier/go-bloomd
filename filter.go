@@ -14,34 +14,39 @@ type Filter struct {
 var yes = []byte("Yes")
 
 // BulkSet adds multiple keys to the filter
-func (f Filter) BulkSet(keyset *KeySet) (ResultReader, error) {
-	err := f.sendBatchOp("b", keyset)
+func (f Filter) BulkSet(reader KeyReader) (ResultReader, error) {
+	count, err := f.sendBatchOp("b", reader)
 	if err != nil {
 		return nil, f.client.handleWriteError(err)
 	}
 
-	return f.readerFor(keyset.Length()), nil
+	return f.readerFor(count), nil
 }
 
 // MultiCheck checks multiple keys for the filter
-func (f Filter) MultiCheck(keyset *KeySet) (ResultReader, error) {
-	err := f.sendBatchOp("m", keyset)
+func (f Filter) MultiCheck(reader KeyReader) (ResultReader, error) {
+	count, err := f.sendBatchOp("m", reader)
 	if err != nil {
 		return nil, f.client.handleWriteError(err)
 	}
 
-	return f.readerFor(keyset.Length()), nil
+	return f.readerFor(count), nil
 }
 
-func (f Filter) sendBatchOp(op string, keyset *KeySet) error {
+func (f Filter) sendBatchOp(op string, reader KeyReader) (int, error) {
+	count := 0
 	w := f.client.writer
 	w.WriteString(op)
 	w.WriteByte(itemDelimeter)
 	w.WriteString(f.Name)
 	w.WriteByte(itemDelimeter)
-	w.Write(keyset.set)
+	for reader.Next() {
+		count++
+		w.Write(reader.Current())
+		w.WriteByte(itemDelimeter)
+	}
 	w.WriteByte(cmdDelimeter)
-	return w.Flush()
+	return count, w.Flush()
 }
 
 // Clear clears the filter
