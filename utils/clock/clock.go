@@ -56,15 +56,15 @@ func DayNum() UnitNum {
 
 // WeekNumOf returns week number of specified time t
 func WeekNumOf(t time.Time) UnitNum {
-	return DayNumOf(t) / period.DaysInWeek
+	return (DayNumOf(t)-1)/period.DaysInWeek + 1
 }
 
 // MonthNumOf returns month number of specified time t
 func MonthNumOf(t time.Time) UnitNum {
-	return UnitNum(int(t.Month()) + t.Year()*12)
+	return UnitNum(int(t.Month()) + (t.Year()-1970)*12)
 }
 
 // DayNumOf returns day number of specified time t
 func DayNumOf(t time.Time) UnitNum {
-	return UnitNum(t.UnixNano() / int64(period.Day))
+	return UnitNum(t.UnixNano()/int64(period.Day)) + 1
 }

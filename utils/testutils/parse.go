@@ -6,6 +6,7 @@ import (
 )
 
 func ParseURL(tb testing.TB, addr string) *url.URL {
+	tb.Helper()
 	u, err := url.Parse(addr)
 	if err != nil {
 		tb.Fatal(err)
