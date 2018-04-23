@@ -139,11 +139,11 @@ func TestFiltersManagement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			checkFilterExists(t, c, namer.NameFor(0))
 			checkFilterExists(t, c, namer.NameFor(1))
 			checkFilterExists(t, c, namer.NameFor(2))
 			checkFilterExists(t, c, namer.NameFor(3))
-			checkFilterExists(t, c, namer.NameFor(4)) // created in advance
+			checkFilterExists(t, c, namer.NameFor(4))
+			checkFilterExists(t, c, namer.NameFor(5)) // created in advance
 		})
 
 		t.Run("test rolling filter drops old filters excluding tail", func(t *testing.T) {
@@ -153,9 +153,9 @@ func TestFiltersManagement(t *testing.T) {
 				t.Fatal(err)
 			}
 			checkFilterDoesNotExists(t, c, namer.NameFor(0))
-			checkFilterExists(t, c, namer.NameFor(1)) // saved as tail
-			checkFilterExists(t, c, namer.NameFor(2))
+			checkFilterExists(t, c, namer.NameFor(2)) // saved as tail
 			checkFilterExists(t, c, namer.NameFor(3))
+			checkFilterExists(t, c, namer.NameFor(4))
 		})
 
 		t.Run("test rolling filter drop all its filters", func(t *testing.T) {
@@ -166,11 +166,11 @@ func TestFiltersManagement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			checkFilterDoesNotExists(t, c, namer.NameFor(0))
 			checkFilterDoesNotExists(t, c, namer.NameFor(1))
 			checkFilterDoesNotExists(t, c, namer.NameFor(2))
 			checkFilterDoesNotExists(t, c, namer.NameFor(3))
-			checkFilterDoesNotExists(t, c, namer.NameFor(4)) // created in advance
+			checkFilterDoesNotExists(t, c, namer.NameFor(4))
+			checkFilterDoesNotExists(t, c, namer.NameFor(5)) // created in advance
 		})
 	})
 }
