@@ -2,6 +2,7 @@ package rolling
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	bloomd "github.com/Applifier/go-bloomd"
@@ -19,21 +20,36 @@ const (
 
 // Filter provides fuctionality of working with multiple sequential filters through time
 type Filter struct {
-	namer  Namer
-	period clock.UnitNum
-	unit   clock.Unit
+	namer    Namer
+	period   clock.UnitNum
+	unit     clock.Unit
+	currUnit func() clock.UnitNum
+}
+
+var currUnitMap = map[clock.Unit]func() clock.UnitNum{
+	RollDaily:   clock.DayNum,
+	RollMonthly: clock.MonthNum,
+	RollWeekly:  clock.WeekNum,
 }
 
 // NewFilter creates a new Filter
 // unit - unit of time, e.g. Week, Day or Month. All keys being set during period with a same unit will be stored in a single filter.
 // period - period in specified time units to consider in check operations
 // namer - provides algorithm to name filters according to specified unit of time
-func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum) *Filter {
-	return &Filter{
-		namer:  namer,
-		unit:   unit,
-		period: period,
+func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum) (*Filter, error) {
+	currUnitFunc, ok := currUnitMap[unit]
+	if !ok {
+		return nil, fmt.Errorf("Unit %s does not supported", unit)
 	}
+	if period >= 100 { // TODO there should be tests to find a good max period
+		return nil, fmt.Errorf("Too wide period")
+	}
+	return &Filter{
+		namer:    namer,
+		unit:     unit,
+		period:   period,
+		currUnit: currUnitFunc,
+	}, nil
 }
 
 // BulkSet sets keys to filter that corresponds to a lates unit
@@ -222,18 +238,6 @@ func (rf *Filter) findFilters(ctx context.Context, cli *bloomd.Client) ([]unitFi
 type unitFilter struct {
 	filter bloomd.Filter
 	unit   clock.UnitNum
-}
-
-func (rf *Filter) currUnit() clock.UnitNum {
-	switch rf.unit {
-	case RollDaily:
-		return clock.DayNum()
-	case RollWeekly:
-		return clock.WeekNum()
-	case RollMonthly:
-		return clock.MonthNum()
-	}
-	return 0
 }
 
 func (rf *Filter) nameForUnit(unit clock.UnitNum) string {

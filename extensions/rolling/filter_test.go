@@ -134,7 +134,7 @@ func TestFiltersManagement(t *testing.T) {
 		defer clock.Reset()
 
 		t.Run("test rolling filter create filters including in advance", func(t *testing.T) {
-			filter := NewFilter(namer, RollWeekly, 4)
+			filter := newFilter(t, namer, RollWeekly, 4)
 			err := filter.CreateFilters(context.Background(), c, 1, 0, 0, true)
 			if err != nil {
 				t.Fatal(err)
@@ -147,7 +147,7 @@ func TestFiltersManagement(t *testing.T) {
 		})
 
 		t.Run("test rolling filter drops old filters excluding tail", func(t *testing.T) {
-			filter := NewFilter(namer, RollWeekly, 2)
+			filter := newFilter(t, namer, RollWeekly, 2)
 			err := filter.DropOlderFilters(context.Background(), c, 1)
 			if err != nil {
 				t.Fatal(err)
@@ -161,7 +161,7 @@ func TestFiltersManagement(t *testing.T) {
 		t.Run("test rolling filter drop all its filters", func(t *testing.T) {
 			// set current time as zero + 4 weeks to delete filter created in advance
 			clock.Static(time.Unix(0, 0).Add(period.Week * 4))
-			filter := NewFilter(namer, RollWeekly, 5)
+			filter := newFilter(t, namer, RollWeekly, 5)
 			err := filter.Drop(context.Background(), c)
 			if err != nil {
 				t.Fatal(err)
@@ -324,7 +324,7 @@ func createBenchFilter(b *testing.B, c *bloomd.Client, prefix string, period clo
 func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period clock.UnitNum, unit clock.Unit) *Filter {
 	tb.Helper()
 	namer := NewNamer(prefix, unit)
-	rf := NewFilter(namer, unit, period)
+	rf := newFilter(tb, namer, unit, period)
 	err := rf.CreateFilters(context.Background(), c, 0, 0, 0, true)
 	if err != nil {
 		tb.Fatal(err)
@@ -363,6 +363,15 @@ func next(t *testing.T, reader bloomd.ResultReader) bool {
 		t.Fatal(err)
 	}
 	return next
+}
+
+func newFilter(tb testing.TB, namer Namer, unit clock.Unit, period clock.UnitNum) *Filter {
+	tb.Helper()
+	filter, err := NewFilter(namer, unit, period)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return filter
 }
 
 func generateSeqKeyReaderReseter(count int) KeyReaderReseter {
