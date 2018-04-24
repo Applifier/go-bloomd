@@ -22,7 +22,7 @@ var resultSetPool = sync.Pool{
 	},
 }
 
-func accrueResultSet(length int) *resultsSet {
+func getResultSet(length int) *resultsSet {
 	rs := resultSetPool.Get().(*resultsSet)
 	rs.reset(length)
 	return rs

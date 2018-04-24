@@ -181,7 +181,7 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
-					reader := AccrueArrayReader(arr)
+					reader := GetArrayReader(arr)
 					rr, err := f.BulkSet(reader)
 					if err != nil {
 						b.Fatal(err)
@@ -191,7 +191,7 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 						b.Fatal(err)
 					}
 					rr.Close()
-					ReleaseArrayReader(reader)
+					PutArrayReader(reader)
 				}
 			})
 
@@ -202,7 +202,7 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
-					reader := AccrueArrayReader(arr)
+					reader := GetArrayReader(arr)
 					rr, err := f.MultiCheck(reader)
 					if err != nil {
 						b.Fatal(err)
@@ -212,7 +212,7 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 						b.Fatal(err)
 					}
 					rr.Close()
-					ReleaseArrayReader(reader)
+					PutArrayReader(reader)
 				}
 			})
 		}

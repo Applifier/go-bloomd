@@ -60,7 +60,7 @@ func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, rr KeyRead
 			return nil, err
 		}
 		if i == 0 {
-			rs = accrueResultSet(reader.Length())
+			rs = getResultSet(reader.Length())
 			defer releaseResultSet(rs)
 			if err = rs.fillFromReader(reader); err != nil {
 				return nil, err

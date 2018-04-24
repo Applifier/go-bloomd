@@ -38,12 +38,12 @@ var srPool = sync.Pool{
 	},
 }
 
-func AccrueArrayReader(arr []Key) *ArrayReader {
+func GetArrayReader(arr []Key) *ArrayReader {
 	reader := srPool.Get().(*ArrayReader)
 	reader.reset(arr)
 	return reader
 }
 
-func ReleaseArrayReader(reader *ArrayReader) {
+func PutArrayReader(reader *ArrayReader) {
 	srPool.Put(reader)
 }
