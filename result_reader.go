@@ -15,6 +15,7 @@ var noToken = []byte("No")
 type ResultReader interface {
 	Next() (bool, error)
 	Read(p []bool) (n int, err error)
+	Length() int // Usually any Reader implementation should not contain Length() method but from bloomd protocol we always know the result length - so it could be usefull information
 	Close() error
 }
 
@@ -75,6 +76,10 @@ func isYes(s []byte) bool {
 
 func isNo(s []byte) bool {
 	return bytes.Equal(s, noToken)
+}
+
+func (r resultReader) Length() int {
+	return r.length
 }
 
 func (r *resultReader) Next() (bool, error) {

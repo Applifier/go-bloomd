@@ -59,15 +59,9 @@ func TestFilter(t *testing.T) {
 				}
 			})
 
-			keySetPool := NewKeySetPool()
-
 			t.Run("set multiple keys", func(t *testing.T) {
-				set := keySetPool.GetKeySet()
-				defer keySetPool.PutKeySet(set)
-				set.AddKey(Key("bar"))
-				set.AddKey(Key("baz"))
-
-				results, err := f.BulkSet(set)
+				reader := NewArrayReader(Key("bar"), Key("baz"))
+				results, err := f.BulkSet(reader)
 				defer results.Close()
 				if err != nil {
 					t.Fatal(err)
@@ -75,13 +69,8 @@ func TestFilter(t *testing.T) {
 			})
 
 			t.Run("check multiple keys", func(t *testing.T) {
-				set := keySetPool.GetKeySet()
-				defer keySetPool.PutKeySet(set)
-				set.AddKey(Key("foo"))
-				set.AddKey(Key("bar"))
-				set.AddKey(Key("baz"))
-				set.AddKey(Key("biz"))
-				resps, err := f.MultiCheck(set)
+				reader := NewArrayReader(Key("foo"), Key("bar"), Key("baz"), Key("biz"))
+				resps, err := f.MultiCheck(reader)
 				defer resps.Close()
 				if err != nil {
 					t.Fatal(err)
@@ -182,8 +171,8 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 				return fmt.Sprintf("%s_bl%d", name, batchLength)
 			}
 
-			ks := generateSeqKeySet(batchLength)
 			readResults := make([]bool, batchLength)
+			arr := generateKeysArr(batchLength)
 
 			b.Run(fmt.Sprintf("BulkSet_%d", batchLength), func(b *testing.B) {
 				f := createBenchmarkFilter(b, url, c, suffixFilter("benchmark_filter_bulkset"))
@@ -192,7 +181,8 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
-					rr, err := f.BulkSet(ks)
+					reader := GetArrayReader(arr)
+					rr, err := f.BulkSet(reader)
 					if err != nil {
 						b.Fatal(err)
 					}
@@ -201,6 +191,7 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 						b.Fatal(err)
 					}
 					rr.Close()
+					PutArrayReader(reader)
 				}
 			})
 
@@ -211,7 +202,8 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
-					rr, err := f.MultiCheck(ks)
+					reader := GetArrayReader(arr)
+					rr, err := f.MultiCheck(reader)
 					if err != nil {
 						b.Fatal(err)
 					}
@@ -220,6 +212,7 @@ func BenchmarkBatchFilterOperations(b *testing.B) {
 						b.Fatal(err)
 					}
 					rr.Close()
+					PutArrayReader(reader)
 				}
 			})
 		}
@@ -293,13 +286,12 @@ func BenchmarkFilterOperations(b *testing.B) {
 	})
 }
 
-func generateSeqKeySet(count int) *KeySet {
-	ksPool := NewKeySetPool()
-	ks := ksPool.GetKeySet()
+func generateKeysArr(count int) []Key {
+	arr := make([]Key, 0)
 	for i := 0; i < count; i++ {
-		ks.AddKey(Key(fmt.Sprintf("key_%d", i)))
+		arr = append(arr, Key(fmt.Sprintf("key_%d", i)))
 	}
-	return ks
+	return arr
 }
 
 func generateSeqKeys(count int) []Key {

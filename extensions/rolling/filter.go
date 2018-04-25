@@ -1,6 +1,10 @@
 package rolling
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	bloomd "github.com/Applifier/go-bloomd"
 	"github.com/Applifier/go-bloomd/utils/clock"
 )
@@ -16,73 +20,95 @@ const (
 
 // Filter provides fuctionality of working with multiple sequential filters through time
 type Filter struct {
-	namer  Namer
-	period clock.UnitNum
-	unit   clock.Unit
-	client *bloomd.Client
-	rs     resultsSet
+	namer    Namer
+	period   clock.UnitNum
+	unit     clock.Unit
+	currUnit func() clock.UnitNum
+}
+
+var currUnitMap = map[clock.Unit]func() clock.UnitNum{
+	RollDaily:   clock.DayNum,
+	RollMonthly: clock.MonthNum,
+	RollWeekly:  clock.WeekNum,
 }
 
 // NewFilter creates a new Filter
 // unit - unit of time, e.g. Week, Day or Month. All keys being set during period with a same unit will be stored in a single filter.
 // period - period in specified time units to consider in check operations
 // namer - provides algorithm to name filters according to specified unit of time
-func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum, client *bloomd.Client) *Filter {
-	return &Filter{
-		namer:  namer,
-		unit:   unit,
-		period: period,
-		client: client,
-		rs:     newResultSet(),
+func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum) (*Filter, error) {
+	currUnitFunc, ok := currUnitMap[unit]
+	if !ok {
+		return nil, fmt.Errorf("Unit %s does not supported", unit)
 	}
+	if period >= 100 { // TODO there should be tests to find a good max period
+		return nil, fmt.Errorf("Too wide period")
+	}
+	return &Filter{
+		namer:    namer,
+		unit:     unit,
+		period:   period,
+		currUnit: currUnitFunc,
+	}, nil
 }
 
 // BulkSet sets keys to filter that corresponds to a lates unit
 // note that it does not check if filter exists
-func (rf *Filter) BulkSet(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
+func (rf *Filter) BulkSet(ctx context.Context, cli *bloomd.Client, reader bloomd.KeyReader) (bloomd.ResultReader, error) {
 	currUnit := rf.currUnit()
-	f := rf.client.GetFilter(rf.nameForUnit(currUnit))
-	return f.BulkSet(ks)
+	f := cli.GetFilter(rf.nameForUnit(currUnit))
+	return f.BulkSet(reader)
 }
 
 // MultiCheck sequentially checks filters through period
 // note that it does not check if filters exist
-func (rf *Filter) MultiCheck(ks *bloomd.KeySet) (bloomd.ResultReader, error) {
+func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, rr KeyReaderReseter) (bloomd.ResultReader, error) {
+	deadline, checkDeadline := ctx.Deadline()
 	currUnit := rf.currUnit()
-	rf.rs.reset(ks.Length())
+	var rs *resultsSet
 	for i := clock.UnitZero; i < rf.period; i++ {
-		f := rf.client.GetFilter(rf.nameForUnit(currUnit - i))
-		reader, err := f.MultiCheck(ks)
+		if checkDeadline && deadline.After(time.Now()) {
+			return nil, context.DeadlineExceeded
+		}
+		f := cli.GetFilter(rf.nameForUnit(currUnit - i))
+		reader, err := f.MultiCheck(rr)
 		if err != nil {
 			return nil, err
 		}
 		if i == 0 {
-			if err = rf.rs.fillFromReader(reader); err != nil {
+			rs = getResultSet(reader.Length())
+			defer releaseResultSet(rs)
+			if err = rs.fillFromReader(reader); err != nil {
 				return nil, err
 			}
 		} else {
-			if err = rf.rs.mergeFromReader(reader); err != nil {
+			if err = rs.mergeFromReader(reader); err != nil {
 				return nil, err
 			}
 		}
+		rr.Reset()
 	}
-	return &rf.rs, nil
+	return rs, nil
 }
 
 // Set sets key to filter that corresponds to a lates unit
 // note that it does not check if filter exists
-func (rf *Filter) Set(k bloomd.Key) (bool, error) {
+func (rf *Filter) Set(ctx context.Context, cli *bloomd.Client, k bloomd.Key) (bool, error) {
 	currUnit := rf.currUnit()
-	f := rf.client.GetFilter(rf.nameForUnit(currUnit))
+	f := cli.GetFilter(rf.nameForUnit(currUnit))
 	return f.Set(k)
 }
 
 // Check sequentially checks filters through period
 // note that it does not check if filters exist
-func (rf *Filter) Check(k bloomd.Key) (bool, error) {
+func (rf *Filter) Check(ctx context.Context, cli *bloomd.Client, k bloomd.Key) (bool, error) {
+	deadline, checkDeadline := ctx.Deadline()
 	currUnit := rf.currUnit()
 	for i := clock.UnitZero; i < rf.period; i++ {
-		f := rf.client.GetFilter(rf.nameForUnit(currUnit - i))
+		if checkDeadline && deadline.After(time.Now()) {
+			return false, context.DeadlineExceeded
+		}
+		f := cli.GetFilter(rf.nameForUnit(currUnit - i))
 		val, err := f.Check(k)
 		if err != nil {
 			return false, err
@@ -95,36 +121,37 @@ func (rf *Filter) Check(k bloomd.Key) (bool, error) {
 }
 
 // Drop drops all filters through period
-func (rf *Filter) Drop() error {
-	return rf.executeForAllFilters(func(f bloomd.Filter) error {
+func (rf *Filter) Drop(ctx context.Context, cli *bloomd.Client) error {
+	return rf.executeForAllFilters(ctx, cli, func(f bloomd.Filter) error {
 		return f.Drop()
 	})
 }
 
 // Close closes all filters through period
-func (rf *Filter) Close() error {
-	return rf.executeForAllFilters(func(f bloomd.Filter) error {
+func (rf *Filter) Close(ctx context.Context, cli *bloomd.Client) error {
+	return rf.executeForAllFilters(ctx, cli, func(f bloomd.Filter) error {
 		return f.Close()
 	})
 }
 
 // Clear clears all filters through period
-func (rf *Filter) Clear() error {
-	return rf.executeForAllFilters(func(f bloomd.Filter) error {
+func (rf *Filter) Clear(ctx context.Context, cli *bloomd.Client) error {
+	return rf.executeForAllFilters(ctx, cli, func(f bloomd.Filter) error {
 		return f.Clear()
 	})
 }
 
 // Flush flushes all filters through period
-func (rf *Filter) Flush() error {
-	return rf.executeForAllFilters(func(f bloomd.Filter) error {
+func (rf *Filter) Flush(ctx context.Context, cli *bloomd.Client) error {
+	return rf.executeForAllFilters(ctx, cli, func(f bloomd.Filter) error {
 		return f.Flush()
 	})
 }
 
 // CreateFilters creates all filters through a specified period
 // if advance is greater than 0 that it will preallocate filters
-func (rf *Filter) CreateFilters(advance clock.UnitNum, capacity int, prob float64, inMemory bool) error {
+func (rf *Filter) CreateFilters(ctx context.Context, cli *bloomd.Client, advance clock.UnitNum, capacity int, prob float64, inMemory bool) error {
+	deadline, checkDeadline := ctx.Deadline()
 	if advance < 0 {
 		advance = 0
 	}
@@ -132,8 +159,11 @@ func (rf *Filter) CreateFilters(advance clock.UnitNum, capacity int, prob float6
 	from := currUnit - rf.period + 1
 	to := currUnit + advance
 	for i := from; i <= to; i++ {
+		if checkDeadline && deadline.After(time.Now()) {
+			return context.DeadlineExceeded
+		}
 		name := rf.nameForUnit(i)
-		_, err := rf.client.CreateFilter(name, capacity, prob, inMemory)
+		_, err := cli.CreateFilter(name, capacity, prob, inMemory)
 		if err != nil {
 			return err
 		}
@@ -143,16 +173,20 @@ func (rf *Filter) CreateFilters(advance clock.UnitNum, capacity int, prob float6
 
 // DropOlderFilters drops all filters that correspond to units older that period
 // if tail is greater that 0 that it will preserve some old filters
-func (rf *Filter) DropOlderFilters(tail clock.UnitNum) error {
+func (rf *Filter) DropOlderFilters(ctx context.Context, cli *bloomd.Client, tail clock.UnitNum) error {
+	deadline, checkDeadline := ctx.Deadline()
 	if tail < 0 {
 		tail = 0
 	}
-	filters, err := rf.findFilters()
+	filters, err := rf.findFilters(ctx, cli)
 	if err != nil {
 		return err
 	}
 	minUnit := rf.currUnit() - rf.period - tail
 	for _, f := range filters {
+		if checkDeadline && deadline.After(time.Now()) {
+			return context.DeadlineExceeded
+		}
 		if err != nil {
 			return err
 		}
@@ -166,12 +200,16 @@ func (rf *Filter) DropOlderFilters(tail clock.UnitNum) error {
 	return nil
 }
 
-func (rf *Filter) executeForAllFilters(filterOp func(f bloomd.Filter) error) error {
-	fs, err := rf.findFilters()
+func (rf *Filter) executeForAllFilters(ctx context.Context, cli *bloomd.Client, filterOp func(f bloomd.Filter) error) error {
+	deadline, checkDeadline := ctx.Deadline()
+	fs, err := rf.findFilters(ctx, cli)
 	if err != nil {
 		return err
 	}
 	for _, f := range fs {
+		if checkDeadline && deadline.After(time.Now()) {
+			return context.DeadlineExceeded
+		}
 		if err = filterOp(f.filter); err != nil {
 			return err
 		}
@@ -179,8 +217,8 @@ func (rf *Filter) executeForAllFilters(filterOp func(f bloomd.Filter) error) err
 	return nil
 }
 
-func (rf *Filter) findFilters() ([]unitFilter, error) {
-	fs, err := rf.client.ListFilters()
+func (rf *Filter) findFilters(ctx context.Context, cli *bloomd.Client) ([]unitFilter, error) {
+	fs, err := cli.ListFilters()
 	if err != nil {
 		return nil, err
 	}
@@ -200,18 +238,6 @@ func (rf *Filter) findFilters() ([]unitFilter, error) {
 type unitFilter struct {
 	filter bloomd.Filter
 	unit   clock.UnitNum
-}
-
-func (rf *Filter) currUnit() clock.UnitNum {
-	switch rf.unit {
-	case RollDaily:
-		return clock.DayNum()
-	case RollWeekly:
-		return clock.WeekNum()
-	case RollMonthly:
-		return clock.MonthNum()
-	}
-	return 0
 }
 
 func (rf *Filter) nameForUnit(unit clock.UnitNum) string {

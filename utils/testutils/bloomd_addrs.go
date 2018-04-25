@@ -51,6 +51,7 @@ func getEnv(name string, def string) string {
 
 // TestForAllAddrs allows to run tests against all bloomd addrs
 func TestForAllAddrs(t *testing.T, f func(*url.URL, *testing.T)) {
+	t.Helper()
 	for _, addr := range BloomdAddrs() {
 		url := ParseURL(t, addr)
 		t.Run("Test address "+addr, func(t *testing.T) {
@@ -61,6 +62,7 @@ func TestForAllAddrs(t *testing.T, f func(*url.URL, *testing.T)) {
 
 // BenchForAllAddrs allows to run benchmarks against all bloomd addrs
 func BenchForAllAddrs(b *testing.B, f func(*url.URL, *testing.B)) {
+	b.Helper()
 	for _, addr := range BloomdAddrs() {
 		url := ParseURL(b, addr)
 		b.Run("Test address "+addr, func(b *testing.B) {
