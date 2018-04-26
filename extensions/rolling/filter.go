@@ -160,8 +160,6 @@ func (rf *Filter) CreateFilters(ctx context.Context, cli *bloomd.Client, advance
 	to := currUnit + advance
 	for i := from; i <= to; i++ {
 		now := time.Now()
-		fmt.Println(fmt.Sprintf("%v", now))
-		fmt.Println(fmt.Sprintf("%v", deadline))
 		if checkDeadline && deadline.Before(now) {
 			return context.DeadlineExceeded
 		}
