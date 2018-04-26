@@ -257,7 +257,7 @@ func checkFilterExists(t *testing.T, c *bloomd.Client, name string) {
 
 func setShouldAddNew(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 	t.Helper()
-	isNew, err := rf.Set(context.Background(), c, bloomd.Key(key))
+	isNew, err := rf.Set(getContext(), c, bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func setShouldAddNew(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 func bulkSetShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
 	set := readerReseter(keys...)
-	results, err := rf.BulkSet(context.Background(), c, set)
+	results, err := rf.BulkSet(getContext(), c, set)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func bulkSetShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...s
 func multiCheckShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
 	set := readerReseter(keys...)
-	results, err := rf.MultiCheck(context.Background(), c, set)
+	results, err := rf.MultiCheck(getContext(), c, set)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func readerReseter(keys ...string) KeyReaderReseter {
 
 func checkShouldFind(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 	t.Helper()
-	b, err := rf.Check(context.Background(), c, bloomd.Key(key))
+	b, err := rf.Check(getContext(), c, bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func checkShouldFind(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 
 func checkShouldNotFind(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 	t.Helper()
-	b, err := rf.Check(context.Background(), c, bloomd.Key(key))
+	b, err := rf.Check(getContext(), c, bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period clock.U
 	tb.Helper()
 	namer := NewNamer(prefix, unit)
 	rf := newFilter(tb, namer, unit, period)
-	err := rf.CreateFilters(context.Background(), c, 0, 0, 0, true)
+	err := rf.CreateFilters(getContext(), c, 0, 0, 0, true)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -334,7 +334,7 @@ func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period clock.U
 
 func dropFilter(tb testing.TB, c *bloomd.Client, rf *Filter) error {
 	tb.Helper()
-	if err := rf.Drop(context.Background(), c); err != nil {
+	if err := rf.Drop(getContext(), c); err != nil {
 		tb.Fatal(err)
 	}
 	return nil
@@ -380,4 +380,9 @@ func generateSeqKeyReaderReseter(count int) KeyReaderReseter {
 		arr = append(arr, bloomd.Key(fmt.Sprintf("key_%d", i)))
 	}
 	return NewArrayReaderReseter(arr...)
+}
+
+func getContext() context.Context {
+	ctx, _ := context.WithTimeout(context.Background(), time.Millisecond*10)
+	return ctx
 }

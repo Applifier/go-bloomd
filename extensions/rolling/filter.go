@@ -67,7 +67,7 @@ func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, rr KeyRead
 	currUnit := rf.currUnit()
 	var rs *resultsSet
 	for i := clock.UnitZero; i < rf.period; i++ {
-		if checkDeadline && deadline.After(time.Now()) {
+		if checkDeadline && deadline.Before(time.Now()) {
 			return nil, context.DeadlineExceeded
 		}
 		f := cli.GetFilter(rf.nameForUnit(currUnit - i))
@@ -105,7 +105,7 @@ func (rf *Filter) Check(ctx context.Context, cli *bloomd.Client, k bloomd.Key) (
 	deadline, checkDeadline := ctx.Deadline()
 	currUnit := rf.currUnit()
 	for i := clock.UnitZero; i < rf.period; i++ {
-		if checkDeadline && deadline.After(time.Now()) {
+		if checkDeadline && deadline.Before(time.Now()) {
 			return false, context.DeadlineExceeded
 		}
 		f := cli.GetFilter(rf.nameForUnit(currUnit - i))
@@ -159,7 +159,10 @@ func (rf *Filter) CreateFilters(ctx context.Context, cli *bloomd.Client, advance
 	from := currUnit - rf.period + 1
 	to := currUnit + advance
 	for i := from; i <= to; i++ {
-		if checkDeadline && deadline.After(time.Now()) {
+		now := time.Now()
+		fmt.Println(fmt.Sprintf("%v", now))
+		fmt.Println(fmt.Sprintf("%v", deadline))
+		if checkDeadline && deadline.Before(now) {
 			return context.DeadlineExceeded
 		}
 		name := rf.nameForUnit(i)
@@ -184,7 +187,7 @@ func (rf *Filter) DropOlderFilters(ctx context.Context, cli *bloomd.Client, tail
 	}
 	minUnit := rf.currUnit() - rf.period - tail
 	for _, f := range filters {
-		if checkDeadline && deadline.After(time.Now()) {
+		if checkDeadline && deadline.Before(time.Now()) {
 			return context.DeadlineExceeded
 		}
 		if err != nil {
@@ -207,7 +210,7 @@ func (rf *Filter) executeForAllFilters(ctx context.Context, cli *bloomd.Client, 
 		return err
 	}
 	for _, f := range fs {
-		if checkDeadline && deadline.After(time.Now()) {
+		if checkDeadline && deadline.Before(time.Now()) {
 			return context.DeadlineExceeded
 		}
 		if err = filterOp(f.filter); err != nil {
