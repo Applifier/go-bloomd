@@ -15,6 +15,9 @@ import (
 	"github.com/Applifier/go-bloomd/utils/testutils"
 )
 
+// those timeouts are for tests not for benchmarks
+var manageOperationTimeout = 1 * time.Second
+var runtimeOperationTimeout = 10 * time.Millisecond
 var units = []clock.Unit{RollDaily, RollMonthly, RollWeekly}
 
 func TestOperations(t *testing.T) {
@@ -135,7 +138,7 @@ func TestFiltersManagement(t *testing.T) {
 
 		t.Run("test rolling filter create filters including in advance", func(t *testing.T) {
 			filter := newFilter(t, namer, RollWeekly, 4)
-			err := filter.CreateFilters(context.Background(), c, 1, 0, 0, true)
+			err := filter.CreateFilters(getContext(manageOperationTimeout), c, 1, 0, 0, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -148,7 +151,7 @@ func TestFiltersManagement(t *testing.T) {
 
 		t.Run("test rolling filter drops old filters excluding tail", func(t *testing.T) {
 			filter := newFilter(t, namer, RollWeekly, 2)
-			err := filter.DropOlderFilters(context.Background(), c, 1)
+			err := filter.DropOlderFilters(getContext(manageOperationTimeout), c, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -162,7 +165,7 @@ func TestFiltersManagement(t *testing.T) {
 			// set current time as zero + 4 weeks to delete filter created in advance
 			clock.Static(time.Unix(0, 0).Add(period.Week * 4))
 			filter := newFilter(t, namer, RollWeekly, 5)
-			err := filter.Drop(context.Background(), c)
+			err := filter.Drop(getContext(manageOperationTimeout), c)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -257,7 +260,7 @@ func checkFilterExists(t *testing.T, c *bloomd.Client, name string) {
 
 func setShouldAddNew(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 	t.Helper()
-	isNew, err := rf.Set(getContext(), c, bloomd.Key(key))
+	isNew, err := rf.Set(getContext(runtimeOperationTimeout), c, bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +272,7 @@ func setShouldAddNew(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 func bulkSetShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
 	set := readerReseter(keys...)
-	results, err := rf.BulkSet(getContext(), c, set)
+	results, err := rf.BulkSet(getContext(runtimeOperationTimeout), c, set)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +282,7 @@ func bulkSetShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...s
 func multiCheckShouldlNotFail(t *testing.T, c *bloomd.Client, rf *Filter, keys ...string) bloomd.ResultReader {
 	t.Helper()
 	set := readerReseter(keys...)
-	results, err := rf.MultiCheck(getContext(), c, set)
+	results, err := rf.MultiCheck(getContext(runtimeOperationTimeout), c, set)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +299,7 @@ func readerReseter(keys ...string) KeyReaderReseter {
 
 func checkShouldFind(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 	t.Helper()
-	b, err := rf.Check(getContext(), c, bloomd.Key(key))
+	b, err := rf.Check(getContext(runtimeOperationTimeout), c, bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +310,7 @@ func checkShouldFind(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 
 func checkShouldNotFind(t *testing.T, c *bloomd.Client, rf *Filter, key string) {
 	t.Helper()
-	b, err := rf.Check(getContext(), c, bloomd.Key(key))
+	b, err := rf.Check(getContext(runtimeOperationTimeout), c, bloomd.Key(key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +328,7 @@ func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period clock.U
 	tb.Helper()
 	namer := NewNamer(prefix, unit)
 	rf := newFilter(tb, namer, unit, period)
-	err := rf.CreateFilters(getContext(), c, 0, 0, 0, true)
+	err := rf.CreateFilters(getContext(manageOperationTimeout), c, 0, 0, 0, true)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -334,7 +337,7 @@ func createFilter(tb testing.TB, c *bloomd.Client, prefix string, period clock.U
 
 func dropFilter(tb testing.TB, c *bloomd.Client, rf *Filter) error {
 	tb.Helper()
-	if err := rf.Drop(getContext(), c); err != nil {
+	if err := rf.Drop(getContext(manageOperationTimeout), c); err != nil {
 		tb.Fatal(err)
 	}
 	return nil
@@ -382,7 +385,7 @@ func generateSeqKeyReaderReseter(count int) KeyReaderReseter {
 	return NewArrayReaderReseter(arr...)
 }
 
-func getContext() context.Context {
-	ctx, _ := context.WithTimeout(context.Background(), time.Millisecond*10)
+func getContext(timeout time.Duration) context.Context {
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	return ctx
 }
