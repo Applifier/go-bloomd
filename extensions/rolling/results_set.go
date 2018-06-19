@@ -1,11 +1,13 @@
 package rolling
 
 import (
-	"io"
+	"errors"
 	"sync"
 
 	bloomd "github.com/Applifier/go-bloomd"
 )
+
+var ErrCursorOverLength = errors.New("resultsSet:reader cursor is over length")
 
 type resultsSet struct {
 	internal     []bool
@@ -86,7 +88,7 @@ func (rs *resultsSet) or(i int, val bool) bool {
 func (rs *resultsSet) Next() (bool, error) {
 	rs.readerCursor++
 	if rs.readerCursor > rs.Length() {
-		return false, io.EOF
+		return false, ErrCursorOverLength
 	}
 	return rs.internal[rs.readerCursor-1], nil
 }

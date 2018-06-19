@@ -2,11 +2,14 @@ package bloomd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/Applifier/go-bloomd/utils/mathutils"
 )
+
+var ErrCursorOverLength = errors.New("resultReader: cursor is over length")
 
 var yesToken = []byte("Yes")
 var noToken = []byte("No")
@@ -104,7 +107,7 @@ func (r *resultReader) Next() (bool, error) {
 		s, err = r.readLastResult()
 		break
 	default:
-		return false, io.EOF
+		return false, ErrCursorOverLength
 	}
 	if err != nil {
 		return false, err
