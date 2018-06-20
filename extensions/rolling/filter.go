@@ -62,10 +62,15 @@ func (rf *Filter) BulkSet(ctx context.Context, cli *bloomd.Client, reader bloomd
 
 // MultiCheck sequentially checks filters through period
 // note that it does not check if filters exist
-func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, rr KeyReaderReseter) (bloomd.ResultReader, error) {
+func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, rr KeyReaderReseter) (resultReader bloomd.ResultReader, err error) {
 	deadline, checkDeadline := ctx.Deadline()
 	currUnit := rf.currUnit()
 	var rs *resultsSet
+	defer func() {
+		if err != nil && rs != nil {
+			releaseResultSet(rs)
+		}
+	}()
 	for i := clock.UnitZero; i < rf.period; i++ {
 		if checkDeadline && deadline.Before(time.Now()) {
 			return nil, context.DeadlineExceeded
@@ -77,7 +82,6 @@ func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, rr KeyRead
 		}
 		if i == 0 {
 			rs = getResultSet(reader.Length())
-			defer releaseResultSet(rs)
 			if err = rs.fillFromReader(reader); err != nil {
 				return nil, err
 			}

@@ -178,6 +178,64 @@ func TestFiltersManagement(t *testing.T) {
 	})
 }
 
+func Disabled_BenchmarkOperationsParallel(b *testing.B) {
+	for _, addr := range testutils.BloomdAddrs() {
+		url := testutils.ParseURL(b, addr)
+		b.Run("Test address "+addr, func(b *testing.B) {
+			c := createClientFromURL(b, url)
+			cp := createClientPoolFromURL(b, url)
+			periods := []clock.UnitNum{1, 5, 10}
+			for _, period := range periods {
+				b.Run(fmt.Sprintf("MultiCheck-p%d", period), func(b *testing.B) {
+					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_multicheck_%d_%s", period, url.Scheme), period, RollWeekly)
+					defer dropFilter(b, c, rf)
+
+					b.RunParallel(func(pb *testing.PB) {
+						for pb.Next() {
+							c := getClientFromPool(b, cp)
+							ks := generateSeqKeyReaderReseter(10)
+							readResults := make([]bool, 10)
+							rr, err := rf.MultiCheck(context.Background(), c, ks)
+							if err != nil {
+								b.Fatal(err)
+							}
+							_, err = rr.Read(readResults)
+							if err != nil {
+								b.Fatal(err)
+							}
+							rr.Close()
+							c.Close()
+						}
+					})
+				})
+
+				b.Run(fmt.Sprintf("BulkSet-p%d", period), func(b *testing.B) {
+					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_bulkset_%d_%s", period, url.Scheme), period, RollWeekly)
+					defer dropFilter(b, c, rf)
+
+					b.RunParallel(func(pb *testing.PB) {
+						for pb.Next() {
+							c := getClientFromPool(b, cp)
+							ks := generateSeqKeyReaderReseter(10)
+							readResults := make([]bool, 10)
+							rr, err := rf.BulkSet(context.Background(), c, ks)
+							if err != nil {
+								b.Fatal(err)
+							}
+							_, err = rr.Read(readResults)
+							if err != nil {
+								b.Fatal(err)
+							}
+							rr.Close()
+							c.Close()
+						}
+					})
+				})
+			}
+		})
+	}
+}
+
 func BenchmarkOperations(b *testing.B) {
 	for _, addr := range testutils.BloomdAddrs() {
 		url := testutils.ParseURL(b, addr)
@@ -352,6 +410,15 @@ func createClientFromURL(tb testing.TB, addr *url.URL) *bloomd.Client {
 	return c
 }
 
+func createClientPoolFromURL(tb testing.TB, addr *url.URL) *bloomd.Pool {
+	tb.Helper()
+	c, err := bloomd.NewPoolFromURL(100, 100, addr)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return c
+}
+
 func closeClient(tb testing.TB, c *bloomd.Client) {
 	tb.Helper()
 	if err := c.Close(); err != nil {
@@ -388,4 +455,13 @@ func generateSeqKeyReaderReseter(count int) KeyReaderReseter {
 func getContext(timeout time.Duration) context.Context {
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	return ctx
+}
+
+func getClientFromPool(tb testing.TB, pool *bloomd.Pool) *bloomd.Client {
+	tb.Helper()
+	c, err := pool.Get()
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return c
 }
