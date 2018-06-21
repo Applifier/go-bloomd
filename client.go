@@ -166,12 +166,10 @@ func (cli *Client) Close() error {
 	}
 
 	err := cli.conn.Close()
+	cli.resultReader.client = nil
 
 	if cli.clientPool != nil {
 		cli.clientPool.Put(cli)
-	} else {
-		// Since we don't need a client object ny more, just handle the reference loop
-		cli.resultReader.client = nil
 	}
 
 	return err
@@ -194,6 +192,7 @@ func (cli *Client) reset(conn net.Conn) {
 	cli.conn = conn
 	cli.reader.Reset(conn)
 	cli.writer.Reset(conn)
+	cli.resultReader.client = cli
 }
 
 func (cli *Client) send(cmd []byte) error {
