@@ -66,9 +66,9 @@ func (s *MockServer) handle(cmdString string) string {
 	switch cmd {
 	case "create":
 		return s.createFilter(args[0])
-	case "b":
+	case "b", "s":
 		return s.bulkSet(args[0], args[1:])
-	case "m":
+	case "m", "c":
 		return s.multiCheck(args[0], args[1:])
 	default:
 		return ""
