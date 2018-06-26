@@ -12,7 +12,7 @@ import (
 
 	"go.uber.org/zap/buffer"
 
-	pool "gopkg.in/fatih/pool.v2"
+	pool "github.com/Applifier/go-conn-pool"
 )
 
 // DefaultBufferSize is the default size for the read buffer

@@ -24,11 +24,6 @@
 #   go-tests = true
 #   unused-packages = true
 
-
-[[constraint]]
-  name = "gopkg.in/fatih/pool.v2"
-  version = "2.0.0"
-
 [prune]
   go-tests = true
   unused-packages = true

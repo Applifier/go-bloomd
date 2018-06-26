@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"sync"
 
-	pool "gopkg.in/fatih/pool.v2"
+	pool "github.com/Applifier/go-conn-pool"
 )
 
 // Factory a factory for conn for the Bloomd client
