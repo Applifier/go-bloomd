@@ -1,0 +1,28 @@
+linters:
+  disable:
+    - megacheck
+  enable:
+    - goconst
+    - unconvert
+    - interfacer
+    - golint
+    - gofmt
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - structcheck
+    - varcheck
+    - ineffassign
+    - deadcode
+    - typecheck
+
+run:
+  build-tags:
+    - integration
+
+issues:
+  exclude-use-default: false
+  exclude: 
+    - G104
