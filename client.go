@@ -45,7 +45,7 @@ func NewFromAddr(addr string) (*Client, error) {
 
 // NewFromURL creates a new bloomd client from URL struct
 func NewFromURL(u *url.URL) (*Client, error) {
-	conn, err := createSocket(u)
+	conn, err := Connect(u)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,11 @@ func NewFromURL(u *url.URL) (*Client, error) {
 	return NewFromConn(conn)
 }
 
-func createSocket(u *url.URL) (net.Conn, error) {
+// Connect initialises a new connection to bloomd server
+// it uses url.Scheme to determine which type of connection should be established:
+// unix - for Unix Domain Socket
+// tcp - for TCP
+func Connect(u *url.URL) (net.Conn, error) {
 	switch u.Scheme {
 	case "unix":
 		return createUnixSocket(u.Path)

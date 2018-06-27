@@ -24,14 +24,14 @@ func NewPoolFromAddr(initialCap, maxCap int, addr string) (*Pool, error) {
 		return nil, err
 	}
 	return NewPoolFromFactory(initialCap, maxCap, func() (net.Conn, error) {
-		return createSocket(l)
+		return Connect(l)
 	})
 }
 
 // NewPoolFromURL return a new pool of client for locator
 func NewPoolFromURL(initialCap, maxCap int, u *url.URL) (*Pool, error) {
 	return NewPoolFromFactory(initialCap, maxCap, func() (net.Conn, error) {
-		return createSocket(u)
+		return Connect(u)
 	})
 }
 
