@@ -66,6 +66,8 @@ func (s *MockServer) handle(cmdString string) string {
 	switch cmd {
 	case "drop":
 		return "Done"
+	case "list":
+		return "START\nEND"
 	case "create":
 		return s.createFilter(args[0])
 	case "b", "s":
