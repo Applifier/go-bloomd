@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 )
 
 // DefaultBufferSize is the default size for the read buffer
@@ -12,6 +13,7 @@ var DefaultBufferSize = 4096
 
 // MockServer includes the conn, reader and the mock filters map
 type MockServer struct {
+	lock    sync.Mutex
 	conn    net.Conn
 	reader  *bufio.Reader
 	filters map[string]map[string]bool
@@ -20,10 +22,25 @@ type MockServer struct {
 // NewMockServer creates and returns a mock server with the supplied connection
 func NewMockServer(conn net.Conn) *MockServer {
 	return &MockServer{
+		lock:    sync.Mutex{},
 		conn:    conn,
 		reader:  bufio.NewReaderSize(conn, DefaultBufferSize),
 		filters: make(map[string]map[string]bool),
 	}
+}
+
+func (s *MockServer) Filters() map[string]map[string]bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	filters := map[string]map[string]bool{}
+	for f, v := range s.filters {
+		sub := map[string]bool{}
+		for k, t := range v {
+			sub[k] = t
+		}
+		filters[f] = sub
+	}
+	return filters
 }
 
 func (s *MockServer) read() (string, error) {
@@ -80,6 +97,8 @@ func (s *MockServer) handle(cmdString string) string {
 }
 
 func (s *MockServer) createFilter(name string) string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	_, present := s.filters[name]
 	if !present {
 		s.filters[name] = make(map[string]bool)
@@ -88,6 +107,8 @@ func (s *MockServer) createFilter(name string) string {
 }
 
 func (s *MockServer) bulkSet(filterName string, keys []string) string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	var responses []string
 	for _, key := range keys {
 		s.filters[filterName][key] = true
@@ -98,6 +119,8 @@ func (s *MockServer) bulkSet(filterName string, keys []string) string {
 }
 
 func (s *MockServer) multiCheck(filterName string, keys []string) string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	var responses []string
 	for _, key := range keys {
 		if s.filters[filterName][key] == true {
