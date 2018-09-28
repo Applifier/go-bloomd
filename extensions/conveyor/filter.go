@@ -1,4 +1,4 @@
-package rolling
+package conveyor
 
 import (
 	"context"
@@ -6,18 +6,8 @@ import (
 	"time"
 
 	bloomd "github.com/Applifier/go-bloomd"
-	"github.com/Applifier/go-bloomd/extensions/aggregation"
 	"github.com/Applifier/go-bloomd/extensions/input"
 	"github.com/Applifier/go-bloomd/utils/clock"
-)
-
-const (
-	// RollDaily roll filter every day
-	RollDaily = clock.DayUnit
-	// RollWeekly roll filter every week
-	RollWeekly = clock.WeekUnit
-	// RollMonthly roll filter every month
-	RollMonthly = clock.MonthUnit
 )
 
 // Namer maps filter names to units
@@ -26,7 +16,16 @@ type Namer interface {
 	ParseUnit(name string) (clock.UnitNum, error)
 }
 
-// Filter provides functionality of working with multiple sequential filters through time
+const (
+	// ShiftDaily roll filter every day
+	ShiftDaily = clock.Unit("d")
+	// ShiftWeekly roll filter every week
+	ShiftWeekly = clock.Unit("w")
+	// ShiftMonthly roll filter every month
+	ShiftMonthly = clock.Unit("m")
+)
+
+// Filter provides fuctionality of working with multiple sequential filters through time
 type Filter struct {
 	namer    Namer
 	period   clock.UnitNum
@@ -35,14 +34,14 @@ type Filter struct {
 }
 
 var currUnitMap = map[clock.Unit]func() clock.UnitNum{
-	RollDaily:   clock.DayNum,
-	RollMonthly: clock.MonthNum,
-	RollWeekly:  clock.WeekNum,
+	ShiftDaily:   clock.DayNum,
+	ShiftWeekly:  clock.WeekNum,
+	ShiftMonthly: clock.MonthNum,
 }
 
 // NewFilter creates a new Filter
 // unit - unit of time, e.g. Week, Day or Month. All keys being set during period with a same unit will be stored in a single filter.
-// period - period in specified time units to consider in check operations
+// period - period in specified time units to consider in set operations
 // namer - provides algorithm to name filters according to specified unit of time
 func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum) (*Filter, error) {
 	currUnitFunc, ok := currUnitMap[unit]
@@ -60,76 +59,69 @@ func NewFilter(namer Namer, unit clock.Unit, period clock.UnitNum) (*Filter, err
 	}, nil
 }
 
-// BulkSet sets keys to filter that corresponds to a lates unit
+// BulkSet sets keys to all filters within the configured period
+// it returns result for oldest filter
 // note that it does not check if filter exists
-func (rf *Filter) BulkSet(ctx context.Context, cli *bloomd.Client, reader bloomd.KeyReader) (bloomd.ResultReader, error) {
-	currUnit := rf.currUnit()
-	f := cli.GetFilter(rf.nameForUnit(currUnit))
-	return f.BulkSet(reader)
-}
-
-// MultiCheck sequentially checks filters through period
-// note that it does not check if filters exist
-func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, rr input.KeyReaderReseter) (resultReader bloomd.ResultReader, err error) {
+func (rf *Filter) BulkSet(ctx context.Context, cli *bloomd.Client, rr input.KeyReaderReseter) (results bloomd.ResultReader, err error) {
 	deadline, checkDeadline := ctx.Deadline()
 	currUnit := rf.currUnit()
-	var rs *aggregation.ResultsSet
-	defer func() {
-		if err != nil && rs != nil {
-			rs.Close()
-		}
-	}()
 	for i := clock.UnitZero; i < rf.period; i++ {
 		if checkDeadline && deadline.Before(time.Now()) {
 			return nil, context.DeadlineExceeded
 		}
 		f := cli.GetFilter(rf.nameForUnit(currUnit - i))
-		reader, err := f.MultiCheck(rr)
+		reader, err := f.BulkSet(rr)
 		if err != nil {
 			return nil, err
 		}
-		if i == 0 {
-			rs = aggregation.GetResultSet(reader.Length())
-			if err = rs.FillFromReader(reader); err != nil {
-				return nil, err
-			}
+		// return bulk set result for oldest unit
+		if i == rf.period-1 {
+			results = reader
 		} else {
-			if err = rs.MergeFromReader(reader); err != nil {
-				return nil, err
-			}
+			reader.Close()
+			rr.Reset()
 		}
-		rr.Reset()
 	}
-	return rs, nil
+	return results, err
 }
 
-// Set sets key to filter that corresponds to a lates unit
-// note that it does not check if filter exists
-func (rf *Filter) Set(ctx context.Context, cli *bloomd.Client, k bloomd.Key) (bool, error) {
-	currUnit := rf.currUnit()
-	f := cli.GetFilter(rf.nameForUnit(currUnit))
-	return f.Set(k)
-}
-
-// Check sequentially checks filters through period
+// MultiCheck checks keys in the oldest filter
 // note that it does not check if filters exist
-func (rf *Filter) Check(ctx context.Context, cli *bloomd.Client, k bloomd.Key) (bool, error) {
+func (rf *Filter) MultiCheck(ctx context.Context, cli *bloomd.Client, reader bloomd.KeyReader) (resultReader bloomd.ResultReader, err error) {
+	currUnit := rf.currUnit()
+	oldestUnit := currUnit - rf.period + 1
+	f := cli.GetFilter(rf.nameForUnit(oldestUnit))
+	return f.MultiCheck(reader)
+}
+
+// Set sets key to all filters within the configured period
+// returns result for set into oldest filter
+// note that it does not check if filter exists
+func (rf *Filter) Set(ctx context.Context, cli *bloomd.Client, k bloomd.Key) (result bool, err error) {
 	deadline, checkDeadline := ctx.Deadline()
 	currUnit := rf.currUnit()
 	for i := clock.UnitZero; i < rf.period; i++ {
 		if checkDeadline && deadline.Before(time.Now()) {
 			return false, context.DeadlineExceeded
 		}
-		f := cli.GetFilter(rf.nameForUnit(currUnit - i))
-		val, err := f.Check(k)
+		fName := rf.nameForUnit(currUnit - i)
+		f := cli.GetFilter(fName)
+		// result will contain set result for the oldest filter
+		result, err = f.Set(k)
 		if err != nil {
 			return false, err
 		}
-		if val {
-			return true, nil
-		}
 	}
-	return false, nil
+	return result, err
+}
+
+// Check sequentially checks filters through period
+// note that it does not check if filters exist
+func (rf *Filter) Check(ctx context.Context, cli *bloomd.Client, k bloomd.Key) (bool, error) {
+	currUnit := rf.currUnit()
+	oldestUnit := currUnit - rf.period + 1
+	f := cli.GetFilter(rf.nameForUnit(oldestUnit))
+	return f.Check(k)
 }
 
 // Drop drops all filters through period

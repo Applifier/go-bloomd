@@ -1,4 +1,4 @@
-package rolling
+package input
 
 import (
 	bloomd "github.com/Applifier/go-bloomd"

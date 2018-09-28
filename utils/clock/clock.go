@@ -1,6 +1,7 @@
 package clock
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Applifier/go-bloomd/utils/period"
@@ -32,6 +33,24 @@ func Static(t time.Time) {
 
 // Unit represents a unit of time, like day, hour, year and etc.
 type Unit string
+
+const (
+	// DayUnit is a unit code for day
+	DayUnit = Unit("d")
+	// WeekUnit is a unit code for week
+	WeekUnit = Unit("w")
+	// MonthUnit is a unit code for month
+	MonthUnit = Unit("m")
+)
+
+func ValidUnit(unit Unit) error {
+	switch unit {
+	case DayUnit, WeekUnit, MonthUnit:
+		return nil
+	default:
+		return fmt.Errorf("Unit %s is unknown", unit)
+	}
+}
 
 // UnitNum is a value of particular Unit from the zero unix time, for example 3d week or 2nd year
 type UnitNum uint32

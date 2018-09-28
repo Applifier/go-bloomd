@@ -1,4 +1,4 @@
-package rolling
+package conveyor
 
 import (
 	"context"
@@ -19,8 +19,10 @@ import (
 
 // those timeouts are for tests not for benchmarks
 var manageOperationTimeout = 1 * time.Second
-var runtimeOperationTimeout = 10 * time.Millisecond
-var units = []clock.Unit{RollDaily, RollMonthly, RollWeekly}
+
+// var runtimeOperationTimeout = 10 * time.Millisecond
+var runtimeOperationTimeout = 10 * time.Minute
+var units = []clock.Unit{ShiftDaily, ShiftMonthly, ShiftWeekly}
 
 func TestOperations(t *testing.T) {
 	testutils.TestForAllAddrs(t, func(url *url.URL, t *testing.T) {
@@ -29,8 +31,13 @@ func TestOperations(t *testing.T) {
 		clock.Static(now)
 		defer clock.Reset()
 		c := createClientFromURL(t, url)
-		rf := createFilter(t, c, filterName, 3, RollWeekly)
+		// creating some more filters in the past and one in a future to be able to test oldest filter fills
+		clock.Static(clock.Now().Add(period.Week))
+		rf := createFilter(t, c, filterName, 7, ShiftWeekly)
 		defer dropFilter(t, c, rf)
+		clock.Static(now)
+		// this is a filter that is going to be tested
+		rf = createFilter(t, c, filterName, 3, ShiftWeekly)
 
 		t.Run("set key", func(t *testing.T) {
 			setShouldAddNew(t, c, rf, "foo")
@@ -44,7 +51,7 @@ func TestOperations(t *testing.T) {
 			checkShouldNotFind(t, c, rf, "dsadasdsa")
 		})
 
-		t.Run("set key on different units", func(t *testing.T) {
+		t.Run("set key on different units within period", func(t *testing.T) {
 			defer clock.Static(now)
 			clock.Static(clock.Now().Add(-period.Week))
 			setShouldAddNew(t, c, rf, "foo-1")
@@ -52,15 +59,29 @@ func TestOperations(t *testing.T) {
 			setShouldAddNew(t, c, rf, "foo-2")
 		})
 
+		t.Run("set key in a future out of period", func(t *testing.T) {
+			defer clock.Static(now)
+			clock.Static(clock.Now().Add(period.Week))
+			setShouldAddNew(t, c, rf, "foo-future")
+		})
+
+		t.Run("set key on old unit out of period", func(t *testing.T) {
+			defer clock.Static(now)
+			clock.Static(clock.Now().Add(-3 * period.Week))
+			setShouldAddNew(t, c, rf, "foo-old")
+		})
+
 		t.Run("check key on different units", func(t *testing.T) {
 			checkShouldFind(t, c, rf, "foo")
 			checkShouldFind(t, c, rf, "foo-1")
 			checkShouldFind(t, c, rf, "foo-2")
+			checkShouldNotFind(t, c, rf, "foo-future")
+			checkShouldNotFind(t, c, rf, "foo-old")
 		})
 
 		t.Run("check key not found on last unit if period lower", func(t *testing.T) {
 			c := createClientFromURL(t, url)
-			rf := createFilter(t, c, filterName, 2, RollWeekly)
+			rf := createFilter(t, c, filterName, 2, ShiftWeekly)
 			checkShouldFind(t, c, rf, "foo")
 			checkShouldFind(t, c, rf, "foo-1")
 			checkShouldNotFind(t, c, rf, "foo-2")
@@ -107,7 +128,7 @@ func TestOperations(t *testing.T) {
 
 		t.Run("check multiple keys not found on last unit if period lower", func(t *testing.T) {
 			c := createClientFromURL(t, url)
-			rf := createFilter(t, c, filterName, 2, RollWeekly)
+			rf := createFilter(t, c, filterName, 2, ShiftWeekly)
 			resps := multiCheckShouldlNotFail(t, c, rf, "foo", "bar-1", "baz-2", "bar-2")
 			defer resps.Close()
 			if !(next(t, resps) == next(t, resps) == true) {
@@ -132,14 +153,14 @@ func TestOperations(t *testing.T) {
 func TestFiltersManagement(t *testing.T) {
 	testutils.TestForAllAddrs(t, func(url *url.URL, t *testing.T) {
 		c := createClientFromURL(t, url)
-		namer := namer.MustNewTimeUnitNamer("test_management_"+url.Scheme, RollWeekly)
+		namer := namer.MustNewTimeUnitNamer("test_management_"+url.Scheme, ShiftWeekly)
 
 		// set current time as zero + 3 weeks
 		clock.Static(time.Unix(0, 0).Add(period.Week * 3))
 		defer clock.Reset()
 
 		t.Run("test rolling filter create filters including in advance", func(t *testing.T) {
-			filter := newFilter(t, namer, RollWeekly, 4)
+			filter := newFilter(t, namer, ShiftWeekly, 4)
 			err := filter.CreateFilters(getContext(manageOperationTimeout), c, 1, 0, 0, true)
 			if err != nil {
 				t.Fatal(err)
@@ -152,7 +173,7 @@ func TestFiltersManagement(t *testing.T) {
 		})
 
 		t.Run("test rolling filter drops old filters excluding tail", func(t *testing.T) {
-			filter := newFilter(t, namer, RollWeekly, 2)
+			filter := newFilter(t, namer, ShiftWeekly, 2)
 			err := filter.DropOlderFilters(getContext(manageOperationTimeout), c, 1)
 			if err != nil {
 				t.Fatal(err)
@@ -166,7 +187,7 @@ func TestFiltersManagement(t *testing.T) {
 		t.Run("test rolling filter drop all its filters", func(t *testing.T) {
 			// set current time as zero + 4 weeks to delete filter created in advance
 			clock.Static(time.Unix(0, 0).Add(period.Week * 4))
-			filter := newFilter(t, namer, RollWeekly, 5)
+			filter := newFilter(t, namer, ShiftWeekly, 5)
 			err := filter.Drop(getContext(manageOperationTimeout), c)
 			if err != nil {
 				t.Fatal(err)
@@ -189,7 +210,7 @@ func Disabled_BenchmarkOperationsParallel(b *testing.B) {
 			periods := []clock.UnitNum{1, 5, 10}
 			for _, period := range periods {
 				b.Run(fmt.Sprintf("MultiCheck-p%d", period), func(b *testing.B) {
-					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_multicheck_%d_%s", period, url.Scheme), period, RollWeekly)
+					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_multicheck_%d_%s", period, url.Scheme), period, ShiftWeekly)
 					defer dropFilter(b, c, rf)
 
 					b.RunParallel(func(pb *testing.PB) {
@@ -212,7 +233,7 @@ func Disabled_BenchmarkOperationsParallel(b *testing.B) {
 				})
 
 				b.Run(fmt.Sprintf("BulkSet-p%d", period), func(b *testing.B) {
-					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_bulkset_%d_%s", period, url.Scheme), period, RollWeekly)
+					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_bulkset_%d_%s", period, url.Scheme), period, ShiftWeekly)
 					defer dropFilter(b, c, rf)
 
 					b.RunParallel(func(pb *testing.PB) {
@@ -248,7 +269,7 @@ func BenchmarkOperations(b *testing.B) {
 			readResults := make([]bool, 100)
 			for _, period := range periods {
 				b.Run(fmt.Sprintf("MultiCheck-p%d", period), func(b *testing.B) {
-					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_multicheck_%d_%s", period, url.Scheme), period, RollWeekly)
+					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_multicheck_%d_%s", period, url.Scheme), period, ShiftWeekly)
 					defer dropFilter(b, c, rf)
 
 					b.ResetTimer()
@@ -268,7 +289,7 @@ func BenchmarkOperations(b *testing.B) {
 				})
 
 				b.Run(fmt.Sprintf("BulkSet-p%d", period), func(b *testing.B) {
-					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_bulkset_%d_%s", period, url.Scheme), period, RollWeekly)
+					rf := createBenchFilter(b, c, fmt.Sprintf("bench_operations_bulkset_%d_%s", period, url.Scheme), period, ShiftWeekly)
 					defer dropFilter(b, c, rf)
 
 					b.ResetTimer()

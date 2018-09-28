@@ -86,4 +86,18 @@ func TestClock(t *testing.T) {
 			t.Fatalf("Should be 2 but was %d", n)
 		}
 	})
+
+	t.Run("ValidUnit should return true if unit is known", func(t *testing.T) {
+		for _, u := range []Unit{DayUnit, WeekUnit, MonthUnit} {
+			if ValidUnit(u) != nil {
+				t.Fatal("Should not return error")
+			}
+		}
+	})
+
+	t.Run("ValidUnit should return true if unit is unknown", func(t *testing.T) {
+		if ValidUnit(Unit("u")) == nil {
+			t.Fatal("Should return error")
+		}
+	})
 }
